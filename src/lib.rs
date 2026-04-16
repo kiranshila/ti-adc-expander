@@ -135,7 +135,9 @@ impl<BUS: I2c> AsyncRegisterInterface for DeviceInterface<BUS> {
         _size_bits: u32,
         data: &[u8],
     ) -> Result<(), Self::Error> {
-        self.i2c.write(self.addr as u8, &[OPCODE_WRITE, address, data[0]]).await
+        self.i2c
+            .write(self.addr as u8, &[OPCODE_WRITE, address, data[0]])
+            .await
     }
 
     async fn read_register(
@@ -144,7 +146,9 @@ impl<BUS: I2c> AsyncRegisterInterface for DeviceInterface<BUS> {
         _size_bits: u32,
         data: &mut [u8],
     ) -> Result<(), Self::Error> {
-        self.i2c.write_read(self.addr as u8, &[OPCODE_READ, address], data).await
+        self.i2c
+            .write_read(self.addr as u8, &[OPCODE_READ, address], data)
+            .await
     }
 }
 
@@ -207,7 +211,10 @@ impl<BUS: I2c, CHIP: Chip, C0, C1, C2, C3, C4, C5, C6, C7>
 
     /// Initiate ADC offset calibration. The `cal` bit auto-clears when complete.
     pub async fn calibrate(&mut self) -> Result<(), BUS::Error> {
-        self.device.general_cfg().modify_async(|r| r.set_cal(true)).await?;
+        self.device
+            .general_cfg()
+            .modify_async(|r| r.set_cal(true))
+            .await?;
         Ok(())
     }
 
@@ -221,11 +228,11 @@ impl<BUS: I2c, CHIP: Chip, C0, C1, C2, C3, C4, C5, C6, C7>
     }
 
     /// Set the oversampling ratio applied to every conversion.
-    pub async fn set_oversampling(
-        &mut self,
-        ratio: OversamplingRatio,
-    ) -> Result<(), BUS::Error> {
-        self.device.osr_cfg().modify_async(|r| r.set_osr(ratio)).await?;
+    pub async fn set_oversampling(&mut self, ratio: OversamplingRatio) -> Result<(), BUS::Error> {
+        self.device
+            .osr_cfg()
+            .modify_async(|r| r.set_osr(ratio))
+            .await?;
         Ok(())
     }
 }
@@ -237,13 +244,19 @@ impl<BUS: I2c, CHIP: HasStats, C0, C1, C2, C3, C4, C5, C6, C7>
 {
     /// Enable the digital window comparator.
     pub async fn enable_dwc(&mut self) -> Result<(), BUS::Error> {
-        self.device.general_cfg().modify_async(|r| r.set_dwc_en(true)).await?;
+        self.device
+            .general_cfg()
+            .modify_async(|r| r.set_dwc_en(true))
+            .await?;
         Ok(())
     }
 
     /// Disable the digital window comparator.
     pub async fn disable_dwc(&mut self) -> Result<(), BUS::Error> {
-        self.device.general_cfg().modify_async(|r| r.set_dwc_en(false)).await?;
+        self.device
+            .general_cfg()
+            .modify_async(|r| r.set_dwc_en(false))
+            .await?;
         Ok(())
     }
 
@@ -279,12 +292,22 @@ impl<BUS: I2c, CHIP: HasStats, C0, C1, C2, C3, C4, C5, C6, C7>
 
     /// Read the high-threshold (or GPIO logic-1) event flags.
     pub async fn event_high_flags(&mut self) -> Result<u8, BUS::Error> {
-        Ok(self.device.event_high_flag().read_async().await?.event_high_flag())
+        Ok(self
+            .device
+            .event_high_flag()
+            .read_async()
+            .await?
+            .event_high_flag())
     }
 
     /// Read the low-threshold (or GPIO logic-0) event flags.
     pub async fn event_low_flags(&mut self) -> Result<u8, BUS::Error> {
-        Ok(self.device.event_low_flag().read_async().await?.event_low_flag())
+        Ok(self
+            .device
+            .event_low_flag()
+            .read_async()
+            .await?
+            .event_low_flag())
     }
 
     /// Clear high-event flags for the given channel bitmask (W1C).
@@ -606,24 +629,94 @@ macro_rules! impl_channel {
     }
 }
 
-impl_channel!(0, (),                         (C1, C2, C3, C4, C5, C6, C7));
-impl_channel!(1, (C0),                       (C2, C3, C4, C5, C6, C7));
-impl_channel!(2, (C0, C1),                   (C3, C4, C5, C6, C7));
-impl_channel!(3, (C0, C1, C2),               (C4, C5, C6, C7));
-impl_channel!(4, (C0, C1, C2, C3),           (C5, C6, C7));
-impl_channel!(5, (C0, C1, C2, C3, C4),       (C6, C7));
-impl_channel!(6, (C0, C1, C2, C3, C4, C5),   (C7));
+impl_channel!(0, (), (C1, C2, C3, C4, C5, C6, C7));
+impl_channel!(1, (C0), (C2, C3, C4, C5, C6, C7));
+impl_channel!(2, (C0, C1), (C3, C4, C5, C6, C7));
+impl_channel!(3, (C0, C1, C2), (C4, C5, C6, C7));
+impl_channel!(4, (C0, C1, C2, C3), (C5, C6, C7));
+impl_channel!(5, (C0, C1, C2, C3, C4), (C6, C7));
+impl_channel!(6, (C0, C1, C2, C3, C4, C5), (C7));
 impl_channel!(7, (C0, C1, C2, C3, C4, C5, C6), ());
 
 // ── Per-part-number type aliases ──────────────────────────────────────────────
 
-pub type Tla2528<BUS, C0 = Unconfigured, C1 = Unconfigured, C2 = Unconfigured, C3 = Unconfigured, C4 = Unconfigured, C5 = Unconfigured, C6 = Unconfigured, C7 = Unconfigured> = Driver<BUS, Tla252x, C0, C1, C2, C3, C4, C5, C6, C7>;
-pub type Tla2518<BUS, C0 = Unconfigured, C1 = Unconfigured, C2 = Unconfigured, C3 = Unconfigured, C4 = Unconfigured, C5 = Unconfigured, C6 = Unconfigured, C7 = Unconfigured> = Driver<BUS, Tla252x, C0, C1, C2, C3, C4, C5, C6, C7>;
-pub type Ads7138<BUS, C0 = Unconfigured, C1 = Unconfigured, C2 = Unconfigured, C3 = Unconfigured, C4 = Unconfigured, C5 = Unconfigured, C6 = Unconfigured, C7 = Unconfigured> = Driver<BUS, Ads7x38, C0, C1, C2, C3, C4, C5, C6, C7>;
-pub type Ads7038<BUS, C0 = Unconfigured, C1 = Unconfigured, C2 = Unconfigured, C3 = Unconfigured, C4 = Unconfigured, C5 = Unconfigured, C6 = Unconfigured, C7 = Unconfigured> = Driver<BUS, Ads7x38, C0, C1, C2, C3, C4, C5, C6, C7>;
-pub type Ads7128<BUS, C0 = Unconfigured, C1 = Unconfigured, C2 = Unconfigured, C3 = Unconfigured, C4 = Unconfigured, C5 = Unconfigured, C6 = Unconfigured, C7 = Unconfigured> = Driver<BUS, Ads7x28, C0, C1, C2, C3, C4, C5, C6, C7>;
-pub type Ads7028<BUS, C0 = Unconfigured, C1 = Unconfigured, C2 = Unconfigured, C3 = Unconfigured, C4 = Unconfigured, C5 = Unconfigured, C6 = Unconfigured, C7 = Unconfigured> = Driver<BUS, Ads7x28, C0, C1, C2, C3, C4, C5, C6, C7>;
+pub type Tla2528<
+    BUS,
+    C0 = Unconfigured,
+    C1 = Unconfigured,
+    C2 = Unconfigured,
+    C3 = Unconfigured,
+    C4 = Unconfigured,
+    C5 = Unconfigured,
+    C6 = Unconfigured,
+    C7 = Unconfigured,
+> = Driver<BUS, Tla252x, C0, C1, C2, C3, C4, C5, C6, C7>;
+pub type Tla2518<
+    BUS,
+    C0 = Unconfigured,
+    C1 = Unconfigured,
+    C2 = Unconfigured,
+    C3 = Unconfigured,
+    C4 = Unconfigured,
+    C5 = Unconfigured,
+    C6 = Unconfigured,
+    C7 = Unconfigured,
+> = Driver<BUS, Tla252x, C0, C1, C2, C3, C4, C5, C6, C7>;
+pub type Ads7138<
+    BUS,
+    C0 = Unconfigured,
+    C1 = Unconfigured,
+    C2 = Unconfigured,
+    C3 = Unconfigured,
+    C4 = Unconfigured,
+    C5 = Unconfigured,
+    C6 = Unconfigured,
+    C7 = Unconfigured,
+> = Driver<BUS, Ads7x38, C0, C1, C2, C3, C4, C5, C6, C7>;
+pub type Ads7038<
+    BUS,
+    C0 = Unconfigured,
+    C1 = Unconfigured,
+    C2 = Unconfigured,
+    C3 = Unconfigured,
+    C4 = Unconfigured,
+    C5 = Unconfigured,
+    C6 = Unconfigured,
+    C7 = Unconfigured,
+> = Driver<BUS, Ads7x38, C0, C1, C2, C3, C4, C5, C6, C7>;
+pub type Ads7128<
+    BUS,
+    C0 = Unconfigured,
+    C1 = Unconfigured,
+    C2 = Unconfigured,
+    C3 = Unconfigured,
+    C4 = Unconfigured,
+    C5 = Unconfigured,
+    C6 = Unconfigured,
+    C7 = Unconfigured,
+> = Driver<BUS, Ads7x28, C0, C1, C2, C3, C4, C5, C6, C7>;
+pub type Ads7028<
+    BUS,
+    C0 = Unconfigured,
+    C1 = Unconfigured,
+    C2 = Unconfigured,
+    C3 = Unconfigured,
+    C4 = Unconfigured,
+    C5 = Unconfigured,
+    C6 = Unconfigured,
+    C7 = Unconfigured,
+> = Driver<BUS, Ads7x28, C0, C1, C2, C3, C4, C5, C6, C7>;
 /// ADS7038H is a higher-throughput (1.5 MSPS vs 1 MSPS) SPI variant of the ADS7038.
 /// The register map and feature set are identical; the speed difference is a hardware
 /// characteristic with no register-level impact.
-pub type Ads7038H<BUS, C0 = Unconfigured, C1 = Unconfigured, C2 = Unconfigured, C3 = Unconfigured, C4 = Unconfigured, C5 = Unconfigured, C6 = Unconfigured, C7 = Unconfigured> = Driver<BUS, Ads7x38, C0, C1, C2, C3, C4, C5, C6, C7>;
+pub type Ads7038H<
+    BUS,
+    C0 = Unconfigured,
+    C1 = Unconfigured,
+    C2 = Unconfigured,
+    C3 = Unconfigured,
+    C4 = Unconfigured,
+    C5 = Unconfigured,
+    C6 = Unconfigured,
+    C7 = Unconfigured,
+> = Driver<BUS, Ads7x38, C0, C1, C2, C3, C4, C5, C6, C7>;
