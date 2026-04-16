@@ -640,83 +640,33 @@ impl_channel!(7, (C0, C1, C2, C3, C4, C5, C6), ());
 
 // ── Per-part-number type aliases ──────────────────────────────────────────────
 
-pub type Tla2528<
-    BUS,
-    C0 = Unconfigured,
-    C1 = Unconfigured,
-    C2 = Unconfigured,
-    C3 = Unconfigured,
-    C4 = Unconfigured,
-    C5 = Unconfigured,
-    C6 = Unconfigured,
-    C7 = Unconfigured,
-> = Driver<BUS, Tla252x, C0, C1, C2, C3, C4, C5, C6, C7>;
-pub type Tla2518<
-    BUS,
-    C0 = Unconfigured,
-    C1 = Unconfigured,
-    C2 = Unconfigured,
-    C3 = Unconfigured,
-    C4 = Unconfigured,
-    C5 = Unconfigured,
-    C6 = Unconfigured,
-    C7 = Unconfigured,
-> = Driver<BUS, Tla252x, C0, C1, C2, C3, C4, C5, C6, C7>;
-pub type Ads7138<
-    BUS,
-    C0 = Unconfigured,
-    C1 = Unconfigured,
-    C2 = Unconfigured,
-    C3 = Unconfigured,
-    C4 = Unconfigured,
-    C5 = Unconfigured,
-    C6 = Unconfigured,
-    C7 = Unconfigured,
-> = Driver<BUS, Ads7x38, C0, C1, C2, C3, C4, C5, C6, C7>;
-pub type Ads7038<
-    BUS,
-    C0 = Unconfigured,
-    C1 = Unconfigured,
-    C2 = Unconfigured,
-    C3 = Unconfigured,
-    C4 = Unconfigured,
-    C5 = Unconfigured,
-    C6 = Unconfigured,
-    C7 = Unconfigured,
-> = Driver<BUS, Ads7x38, C0, C1, C2, C3, C4, C5, C6, C7>;
-pub type Ads7128<
-    BUS,
-    C0 = Unconfigured,
-    C1 = Unconfigured,
-    C2 = Unconfigured,
-    C3 = Unconfigured,
-    C4 = Unconfigured,
-    C5 = Unconfigured,
-    C6 = Unconfigured,
-    C7 = Unconfigured,
-> = Driver<BUS, Ads7x28, C0, C1, C2, C3, C4, C5, C6, C7>;
-pub type Ads7028<
-    BUS,
-    C0 = Unconfigured,
-    C1 = Unconfigured,
-    C2 = Unconfigured,
-    C3 = Unconfigured,
-    C4 = Unconfigured,
-    C5 = Unconfigured,
-    C6 = Unconfigured,
-    C7 = Unconfigured,
-> = Driver<BUS, Ads7x28, C0, C1, C2, C3, C4, C5, C6, C7>;
-/// ADS7038H is a higher-throughput (1.5 MSPS vs 1 MSPS) SPI variant of the ADS7038.
-/// The register map and feature set are identical; the speed difference is a hardware
-/// characteristic with no register-level impact.
-pub type Ads7038H<
-    BUS,
-    C0 = Unconfigured,
-    C1 = Unconfigured,
-    C2 = Unconfigured,
-    C3 = Unconfigured,
-    C4 = Unconfigured,
-    C5 = Unconfigured,
-    C6 = Unconfigured,
-    C7 = Unconfigured,
-> = Driver<BUS, Ads7x38, C0, C1, C2, C3, C4, C5, C6, C7>;
+macro_rules! chip_alias {
+    ($(#[$attr:meta])* $name:ident, $chip:ty) => {
+        $(#[$attr])*
+        pub type $name<
+            BUS,
+            C0 = Unconfigured,
+            C1 = Unconfigured,
+            C2 = Unconfigured,
+            C3 = Unconfigured,
+            C4 = Unconfigured,
+            C5 = Unconfigured,
+            C6 = Unconfigured,
+            C7 = Unconfigured,
+        > = Driver<BUS, $chip, C0, C1, C2, C3, C4, C5, C6, C7>;
+    };
+}
+
+chip_alias!(Tla2528, Tla252x);
+chip_alias!(Tla2518, Tla252x);
+chip_alias!(Ads7138, Ads7x38);
+chip_alias!(Ads7038, Ads7x38);
+chip_alias!(
+    /// ADS7038H is a higher-throughput (1.5 MSPS vs 1 MSPS) SPI variant of the ADS7038.
+    /// The register map and feature set are identical; the speed difference is a hardware
+    /// characteristic with no register-level impact.
+    Ads7038H,
+    Ads7x38
+);
+chip_alias!(Ads7128, Ads7x28);
+chip_alias!(Ads7028, Ads7x28);
