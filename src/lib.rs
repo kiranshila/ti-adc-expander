@@ -456,3 +456,20 @@ impl_channel!(4, (C0, C1, C2, C3),           (C5, C6, C7));
 impl_channel!(5, (C0, C1, C2, C3, C4),       (C6, C7));
 impl_channel!(6, (C0, C1, C2, C3, C4, C5),   (C7));
 impl_channel!(7, (C0, C1, C2, C3, C4, C5, C6), ());
+
+// ── Chip aliases ──────────────────────────────────────────────────────────────
+
+/// The ADS7128 is register-compatible with the ADS7138 and is supported by
+/// this driver. Use [`Ads7138::new`] to construct, or name the binding as
+/// `Ads7128` for clarity.
+pub type Ads7128<
+    BUS,
+    C0 = Unconfigured,
+    C1 = Unconfigured,
+    C2 = Unconfigured,
+    C3 = Unconfigured,
+    C4 = Unconfigured,
+    C5 = Unconfigured,
+    C6 = Unconfigured,
+    C7 = Unconfigured,
+> = Ads7138<BUS, C0, C1, C2, C3, C4, C5, C6, C7>;

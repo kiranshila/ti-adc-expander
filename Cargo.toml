@@ -3,9 +3,9 @@ name = "ads7138"
 version = "0.1.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
-description = "Async embedded-hal driver for the TI ADS7138 12-bit 8-channel I2C ADC"
+description = "Async embedded-hal driver for the TI ADS7128/ADS7138 12-bit 8-channel I2C ADC"
 repository = "https://github.com/kiranshila/ads7138"
-keywords = ["ads7138", "adc", "i2c", "embedded-hal", "no-std"]
+keywords = ["ads7138", "ads7128", "adc", "i2c", "embedded-hal"]
 categories = ["embedded", "no-std", "hardware-support"]
 
 [dependencies]

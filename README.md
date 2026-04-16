@@ -1,8 +1,11 @@
 # ads7138
 
-An async Rust driver for the [Texas Instruments ADS7138](https://www.ti.com/product/ADS7138) —
-a 12-bit, 8-channel, I2C ADC with configurable GPIO, digital window comparator, alert output,
-oversampling, and RMS calculation.
+An async Rust driver for the TI ADS7128 and ADS7138 — 12-bit, 8-channel, I2C ADCs with
+configurable GPIO, digital window comparator, alert output, oversampling, and RMS calculation.
+
+The two chips share an identical register map and are fully interchangeable in this driver.
+The ADS7138 additionally includes a programmable gain amplifier (PGA), which is not yet
+exposed by this driver. Use the `Ads7128` or `Ads7138` type aliases interchangeably.
 
 Built on [`embedded-hal-async`](https://crates.io/crates/embedded-hal-async) and
 [`device-driver`](https://crates.io/crates/device-driver). All methods return the I2C bus
