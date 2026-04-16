@@ -1,4 +1,4 @@
-#![cfg_attr(not(test), no_std)]
+#![no_std]
 
 use device_driver::AsyncRegisterInterface;
 use embedded_hal_async::i2c::I2c;

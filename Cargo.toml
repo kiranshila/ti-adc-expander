@@ -3,6 +3,10 @@ name = "ads7138"
 version = "0.1.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
+description = "Async embedded-hal driver for the TI ADS7138 12-bit 8-channel I2C ADC"
+repository = "https://github.com/kiranshila/ads7138"
+keywords = ["ads7138", "adc", "i2c", "embedded-hal", "no-std"]
+categories = ["embedded", "no-std", "hardware-support"]
 
 [dependencies]
 device-driver = { version = "1", default-features = false, features = ["yaml"] }
@@ -12,8 +16,7 @@ pastey = "0.2"
 
 [features]
 default = ["defmt"]
-defmt = ["dep:defmt"]
+defmt = ["dep:defmt", "embedded-hal-async/defmt-03"]
 
 [lib]
 test = false
-bench = false
