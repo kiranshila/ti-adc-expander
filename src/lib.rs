@@ -623,3 +623,7 @@ pub type Ads7138<BUS, C0 = Unconfigured, C1 = Unconfigured, C2 = Unconfigured, C
 pub type Ads7038<BUS, C0 = Unconfigured, C1 = Unconfigured, C2 = Unconfigured, C3 = Unconfigured, C4 = Unconfigured, C5 = Unconfigured, C6 = Unconfigured, C7 = Unconfigured> = Driver<BUS, Ads7x38, C0, C1, C2, C3, C4, C5, C6, C7>;
 pub type Ads7128<BUS, C0 = Unconfigured, C1 = Unconfigured, C2 = Unconfigured, C3 = Unconfigured, C4 = Unconfigured, C5 = Unconfigured, C6 = Unconfigured, C7 = Unconfigured> = Driver<BUS, Ads7x28, C0, C1, C2, C3, C4, C5, C6, C7>;
 pub type Ads7028<BUS, C0 = Unconfigured, C1 = Unconfigured, C2 = Unconfigured, C3 = Unconfigured, C4 = Unconfigured, C5 = Unconfigured, C6 = Unconfigured, C7 = Unconfigured> = Driver<BUS, Ads7x28, C0, C1, C2, C3, C4, C5, C6, C7>;
+/// ADS7038H is a higher-throughput (1.5 MSPS vs 1 MSPS) SPI variant of the ADS7038.
+/// The register map and feature set are identical; the speed difference is a hardware
+/// characteristic with no register-level impact.
+pub type Ads7038H<BUS, C0 = Unconfigured, C1 = Unconfigured, C2 = Unconfigured, C3 = Unconfigured, C4 = Unconfigured, C5 = Unconfigured, C6 = Unconfigured, C7 = Unconfigured> = Driver<BUS, Ads7x38, C0, C1, C2, C3, C4, C5, C6, C7>;

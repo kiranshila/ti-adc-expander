@@ -2,14 +2,15 @@
 
 An async Rust driver for the TI family of 12-bit, 8-channel ADC + GPIO expander chips:
 
-| Part     | Interface | Chip type  | DWC / Alerts / Stats | RMS | ZCD | Temp range      |
-|----------|-----------|------------|:--------------------:|:---:|:---:|-----------------|
-| TLA2518  | SPI       | `Tla252x`  |                      |     |     | −40 to +85 °C   |
-| TLA2528  | I²C       | `Tla252x`  |                      |     |     | −40 to +85 °C   |
-| ADS7038  | SPI       | `Ads7x38`  | ✓                    |     |     | −40 to +125 °C  |
-| ADS7138  | I²C       | `Ads7x38`  | ✓                    |     |     | −40 to +125 °C  |
-| ADS7028  | SPI       | `Ads7x28`  | ✓                    | ✓   | ✓   | −40 to +85 °C   |
-| ADS7128  | I²C       | `Ads7x28`  | ✓                    | ✓   | ✓   | −40 to +85 °C   |
+| Part     | Interface | Max rate | Chip type  | DWC / Alerts / Stats | RMS | ZCD | Temp range      |
+|----------|-----------|----------|------------|:--------------------:|:---:|:---:|-----------------|
+| TLA2518  | SPI       | 1 MSPS   | `Tla252x`  |                      |     |     | −40 to +85 °C   |
+| TLA2528  | I²C       | 140 kSPS | `Tla252x`  |                      |     |     | −40 to +85 °C   |
+| ADS7038  | SPI       | 1 MSPS   | `Ads7x38`  | ✓                    |     |     | −40 to +125 °C  |
+| ADS7038H | SPI       | 1.5 MSPS | `Ads7x38`  | ✓                    |     |     | −40 to +125 °C  |
+| ADS7138  | I²C       | 140 kSPS | `Ads7x38`  | ✓                    |     |     | −40 to +125 °C  |
+| ADS7028  | SPI       | 1 MSPS   | `Ads7x28`  | ✓                    | ✓   | ✓   | −40 to +85 °C   |
+| ADS7128  | I²C       | 140 kSPS | `Ads7x28`  | ✓                    | ✓   | ✓   | −40 to +85 °C   |
 
 All chips are type-aliased (`Ads7138<BUS>`, `Tla2528<BUS>`, etc.) over a common
 `Driver<BUS, CHIP, C0..C7>` struct. Features unavailable on a given chip are
