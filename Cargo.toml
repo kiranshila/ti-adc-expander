@@ -5,7 +5,7 @@ edition = "2024"
 license = "MIT OR Apache-2.0"
 description = "Async embedded-hal driver for the TI TLA2518/2528, ADS7038/7138, and ADS7028/7128 12-bit 8-channel ADC+GPIO expanders"
 repository = "https://github.com/kiranshila/ti-adc-expander"
-keywords = ["ads7138", "ads7128", "tla2528", "adc", "embedded-hal"]
+keywords = ["ads7138", "ads7128", "tla2528", "ads7028", "adc"]
 categories = ["embedded", "no-std", "hardware-support"]
 
 [dependencies]

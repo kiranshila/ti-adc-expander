@@ -1,43 +1,74 @@
-# ads7138
+# ti-adc-expander
 
-An async Rust driver for the TI ADS7128 and ADS7138 — 12-bit, 8-channel, I2C ADCs with
-configurable GPIO, digital window comparator, alert output, oversampling, and RMS calculation.
+An async Rust driver for the TI family of 12-bit, 8-channel ADC + GPIO expander chips:
 
-The two chips share an identical register map and are fully interchangeable in this driver.
-The ADS7138 additionally includes a programmable gain amplifier (PGA), which is not yet
-exposed by this driver. Use the `Ads7128` or `Ads7138` type aliases interchangeably.
+| Part     | Interface | Chip type  | DWC / Alerts / Stats | RMS | ZCD | Temp range      |
+|----------|-----------|------------|:--------------------:|:---:|:---:|-----------------|
+| TLA2518  | SPI       | `Tla252x`  |                      |     |     | −40 to +85 °C   |
+| TLA2528  | I²C       | `Tla252x`  |                      |     |     | −40 to +85 °C   |
+| ADS7038  | SPI       | `Ads7x38`  | ✓                    |     |     | −40 to +125 °C  |
+| ADS7138  | I²C       | `Ads7x38`  | ✓                    |     |     | −40 to +125 °C  |
+| ADS7028  | SPI       | `Ads7x28`  | ✓                    | ✓   | ✓   | −40 to +85 °C   |
+| ADS7128  | I²C       | `Ads7x28`  | ✓                    | ✓   | ✓   | −40 to +85 °C   |
+
+All chips are type-aliased (`Ads7138<BUS>`, `Tla2528<BUS>`, etc.) over a common
+`Driver<BUS, CHIP, C0..C7>` struct. Features unavailable on a given chip are
+gated at compile time via trait bounds — calling `read_ch0_polled()` on a
+`Tla252x` is a type error.
 
 Built on [`embedded-hal-async`](https://crates.io/crates/embedded-hal-async) and
-[`device-driver`](https://crates.io/crates/device-driver). All methods return the I2C bus
-error type directly — no wrapper enum.
+[`device-driver`](https://crates.io/crates/device-driver). All methods return the
+bus error type directly — no wrapper enum.
+
+> **Note:** SPI variants (TLA2518, ADS7038, ADS7028) share the same register map
+> as their I²C counterparts but require a different `DeviceInterface`
+> implementation. I²C support is complete; SPI support is planned.
 
 ## Features
 
 - Async-only, `no_std` compatible
-- Typestate-enforced channel configuration — analog/digital-in/digital-out modes are checked at
-  compile time; calling `read_ch0()` on a channel configured as digital output is a type error
-- Two analog read strategies:
-  - SCL-stretch read (one I2C transaction, uses clock stretching)
+- Compile-time chip capability gating via sealed trait hierarchy
+- Typestate-enforced channel configuration — analog / digital-in / digital-out
+  modes are verified at compile time
+- Two analog read strategies (ADS7x38 / ADS7x28):
+  - SCL-stretch read (one I²C transaction, uses clock stretching)
   - Polled read (no clock stretching; uses `CNVST` + `OSR_DONE` polling)
-- Full register access via the `device` field for anything not covered by the high-level API
+- TLA2528 / TLA2518: SCL-stretch read only (no statistics registers)
+- Full register access via the `device` field for anything not covered by the API
 - Optional `defmt` support via the `defmt` feature
 
 ## Cargo.toml
 
 ```toml
 [dependencies]
-ads7138 = "0.1"
+ti-adc-expander = "0.1"
 ```
 
 To enable `defmt`:
 
 ```toml
-ads7138 = { version = "0.1", features = ["defmt"] }
+ti-adc-expander = { version = "0.1", features = ["defmt"] }
 ```
 
-## I2C address
+## Chip capability tiers
 
-The device address is configured by resistors on the `ADDR` pin. Use the `Address` enum:
+```
+Tla252x  (TLA2518 / TLA2528)
+│  ADC reads (SCL-stretch), GPIO, oversampling, sequencing
+│
+└── Ads7x38  (ADS7038 / ADS7138)          [+ HasStats]
+    │  Polled ADC reads, digital window comparator,
+    │  per-channel alert thresholds, min/max/recent statistics,
+    │  ALERT pin, GPO trigger on events
+    │
+    └── Ads7x28  (ADS7028 / ADS7128)      [+ HasRmsZcd]
+           RMS computation, zero-crossing detection,
+           ZCD-linked GPO output control
+```
+
+## I²C address
+
+The device address is set by resistors on the `ADDR` pin (I²C parts only):
 
 | Variant | Address | R1       | R2       |
 |---------|---------|----------|----------|
@@ -53,67 +84,91 @@ The device address is configured by resistors on the `ADDR` pin. Use the `Addres
 ## Quick start
 
 ```rust
-use ads7138::{Ads7138, Address, OversamplingRatio};
+use ti_adc_expander::{Ads7138, Address, OversamplingRatio};
 
-// Create the driver (all channels start as `Unconfigured`)
+// Create the driver — all channels start as `Unconfigured`
 let mut adc = Ads7138::new(i2c, Address::X10);
 
 // Optional: clear the power-on brown-out flag and set oversampling
 adc.clear_bor().await?;
 adc.set_oversampling(OversamplingRatio::Osr16).await?;
 
-// Configure channels — each configure call consumes the driver and returns
-// a new one with the updated channel type in the signature
+// Configure channels — each call consumes the driver and returns a new one
+// with the updated channel type baked into the signature
 let mut adc = adc
     .configure_ch0_as_analog().await?
     .configure_ch1_as_analog().await?
     .configure_ch2_as_digital_in().await?
     .configure_ch3_as_digital_out_push_pull().await?;
 
-// Read analog channels (SCL stretching)
-let ch0: u16 = adc.read_ch0().await?;          // 0–4095
-let ch1: u16 = adc.read_ch1().await?;
+// Read analog (SCL stretching — available on all chips)
+let ch0: u16 = adc.read_ch0().await?;    // 0–4095
 
-// Read without SCL stretching (polls OSR_DONE)
+// Read without SCL stretching (ADS7x38 / ADS7x28 only)
 let ch0: u16 = adc.read_ch0_polled().await?;
 
-// Read/write digital channels
+// Digital I/O
 let high: bool = adc.is_ch2_high().await?;
 adc.write_ch3(true).await?;
 ```
 
 ## Analog reads — SCL stretching vs. polled
 
-The ADS7138 supports two conversion trigger modes:
+**SCL-stretch** (`read_chN`, all chips): A raw I²C read causes the device to
+stretch SCL while converting (~1.17 µs at 1 MHz). Simple but not supported by
+all I²C host controllers.
 
-**SCL-stretch** (`read_chN`): A raw I2C read causes the device to stretch SCL while it converts
-(~1.17 µs at 1 MHz). This is the simplest approach but some I2C host controllers do not support
-clock stretching.
+**Polled** (`read_chN_polled`, ADS7x38 / ADS7x28 only): Enables `STATS_EN`,
+triggers conversion via `CNVST`, spins until `OSR_DONE`, then reads from the
+`RECENT_CHx` statistics registers. No clock stretching. Not available on
+TLA252x, which lacks the statistics register block.
 
-**Polled** (`read_chN_polled`): Enables the statistics module (`STATS_EN`), triggers the
-conversion via `CNVST`, spins until `OSR_DONE` is set, then reads the result from the
-`RECENT_CHx` registers. No SCL stretching required.
-
-## Alert thresholds (analog channels)
+## Alert thresholds (ADS7x38 / ADS7x28)
 
 ```rust
-// Set 12-bit high/low thresholds and a 4-bit hysteresis for channel 0
-adc.set_ch0_thresholds(3000, 500).await?;   // high=3000, low=500 (out-of-window alert)
-adc.set_ch0_hysteresis(4).await?;           // effective hysteresis = 4 << 3 LSBs
-adc.set_ch0_event_count(2).await?;          // alert fires after 3 consecutive violations
+// Set 12-bit high/low thresholds for channel 0
+adc.set_ch0_thresholds(3000, 500).await?;
+adc.set_ch0_hysteresis(4).await?;       // effective = 4 << 3 LSBs
+adc.set_ch0_event_count(2).await?;      // alert fires after 3 consecutive violations
 
-// Enable alert for channel 0 and configure the ALERT pin
+// Configure the ALERT pin (open-drain, active-low)
 adc.set_alert_channel_mask(0b0000_0001).await?;
-adc.configure_alert_pin(false, AlertLogic::ActiveLow).await?;   // open-drain, active-low
+adc.configure_alert_pin(false, AlertLogic::ActiveLow).await?;
 
-// Later, read and clear flags
+// Read and clear flags
 let highs = adc.event_high_flags().await?;
 adc.clear_event_high_flags(highs).await?;
 ```
 
+## RMS and ZCD (ADS7x28 only)
+
+```rust
+use ti_adc_expander::{Ads7128, RmsChannelId, RmsSampleCount};
+
+let mut adc = Ads7128::new(i2c, Address::X10);
+
+// Enable statistics (required for RMS)
+adc.enable_dwc().await?;
+
+// Configure and read RMS on channel 0
+adc.configure_rms(RmsChannelId::Ain0, true, RmsSampleCount::Samples4096).await?;
+let rms: u16 = adc.read_rms().await?;
+
+// Zero-crossing detection
+adc.configure_zcd_blanking(false, 10).await?;
+adc.set_zcd_gpo_ch0_ch3(
+    ZcdGpoValue::Rise1Fall0,
+    ZcdGpoValue::Rise0Fall0,
+    ZcdGpoValue::Rise0Fall0,
+    ZcdGpoValue::Rise0Fall0,
+).await?;
+adc.set_zcd_gpo_update_mask(0b0000_0001).await?;
+```
+
 ## Reset
 
-`reset()` writes the `RST` bit and returns a fresh driver with all channels back to `Unconfigured`:
+`reset()` issues a soft reset and returns a fresh driver with all channels back
+to `Unconfigured`, preserving the chip type:
 
 ```rust
 let adc = adc.reset().await?;
@@ -122,20 +177,19 @@ let adc = adc.reset().await?;
 
 ## Direct register access
 
-The `device` field exposes the full generated register map for anything not covered by the
+The `device` field exposes the full register map for anything not covered by the
 high-level API:
 
 ```rust
-// Enable autonomous conversion mode
 adc.device.opmode_cfg().modify_async(|r| {
     r.set_conv_mode(ConvMode::Autonomous)
 }).await?;
 
-// Configure auto-sequence over channels 0–3
 adc.device.sequence_cfg().modify_async(|r| {
     r.set_seq_mode(SeqMode::AutoSequence);
     r.set_seq_start(true);
 }).await?;
+
 adc.device.auto_seq_ch_sel().write_with_zero_async(|r| {
     r.set_auto_seq_ch_sel(0x0F)
 }).await?;
@@ -143,5 +197,5 @@ adc.device.auto_seq_ch_sel().write_with_zero_async(|r| {
 
 ## License
 
-Licensed under either of [Apache License 2.0](LICENSE-APACHE) or [MIT License](LICENSE-MIT) at
-your option.
+Licensed under either of [Apache License 2.0](LICENSE-APACHE) or
+[MIT License](LICENSE-MIT) at your option.
