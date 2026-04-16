@@ -3,6 +3,48 @@
 use device_driver::AsyncRegisterInterface;
 use embedded_hal_async::i2c::I2c;
 
+// ── Chip typestates ───────────────────────────────────────────────────────────
+
+mod sealed {
+    pub trait Chip {}
+}
+
+/// Marker trait implemented by all supported chips in this family.
+pub trait Chip: sealed::Chip {}
+
+/// TLA2518 (SPI) / TLA2528 (I²C): base feature set.
+/// Supports ADC conversion, GPIO, oversampling, and sequencing.
+/// No alert output, no statistics registers, no DWC.
+pub struct Tla252x;
+
+/// ADS7038 (SPI) / ADS7138 (I²C): adds digital window comparator, per-channel
+/// alert thresholds, statistics (min/max/recent) registers, and GPO trigger.
+pub struct Ads7x38;
+
+/// ADS7028 (SPI) / ADS7128 (I²C): full feature set — adds RMS computation and
+/// zero-crossing detection on top of all ADS7x38 capabilities.
+pub struct Ads7x28;
+
+impl sealed::Chip for Tla252x {}
+impl sealed::Chip for Ads7x38 {}
+impl sealed::Chip for Ads7x28 {}
+impl Chip for Tla252x {}
+impl Chip for Ads7x38 {}
+impl Chip for Ads7x28 {}
+
+/// Implemented by chips with alert output, digital window comparator, threshold
+/// registers, and statistics (min/max/recent): ADS7x38 and ADS7x28.
+pub trait HasStats: Chip {}
+impl HasStats for Ads7x38 {}
+impl HasStats for Ads7x28 {}
+
+/// Implemented by chips with RMS computation and zero-crossing detection:
+/// ADS7x28 only.
+pub trait HasRmsZcd: HasStats {}
+impl HasRmsZcd for Ads7x28 {}
+
+// ── ZCD GPO value type ────────────────────────────────────────────────────────
+
 /// GPO output value applied on a zero-crossing detection edge (rise/fall).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -29,6 +71,8 @@ impl From<ZcdGpoValue> for u8 {
         v as u8
     }
 }
+
+// ── Register map ──────────────────────────────────────────────────────────────
 
 device_driver::create_device!(device_name: Device, manifest: "device.yaml");
 
@@ -69,9 +113,9 @@ const OPCODE_READ: u8 = 0x10;
 const OPCODE_WRITE: u8 = 0x08;
 
 impl<BUS: I2c> DeviceInterface<BUS> {
-    /// Raw I2C read that triggers an ADC conversion.
+    /// Raw I2C read that triggers an ADC conversion via SCL stretching.
     ///
-    /// The ADS7138 stretches SCL while converting (~1.17 µs @ 1 MHz).
+    /// The device stretches SCL while converting (~1.17 µs @ 1 MHz).
     /// Channel must be selected via MANUAL_CH_SEL before calling this.
     /// Returns the raw 16-bit output word; bits [15:4] hold the 12-bit result MSB-aligned.
     pub(crate) async fn read_conversion_raw(&mut self) -> Result<u16, BUS::Error> {
@@ -115,8 +159,9 @@ pub struct PushPull;
 
 // ── Driver struct ─────────────────────────────────────────────────────────────
 
-pub struct Ads7138<
+pub struct Driver<
     BUS,
+    CHIP,
     C0 = Unconfigured,
     C1 = Unconfigured,
     C2 = Unconfigured,
@@ -127,31 +172,37 @@ pub struct Ads7138<
     C7 = Unconfigured,
 > {
     pub device: Device<DeviceInterface<BUS>>,
+    _chip: core::marker::PhantomData<CHIP>,
     _channels: core::marker::PhantomData<(C0, C1, C2, C3, C4, C5, C6, C7)>,
 }
 
-impl<BUS: I2c> Ads7138<BUS> {
+impl<BUS: I2c, CHIP: Chip> Driver<BUS, CHIP> {
     pub fn new(i2c: BUS, addr: Address) -> Self {
         Self {
             device: Device::new(DeviceInterface { i2c, addr }),
+            _chip: core::marker::PhantomData,
             _channels: core::marker::PhantomData,
         }
     }
 }
 
-// ── Global device methods ─────────────────────────────────────────────────────
+// ── Global methods: all chips ─────────────────────────────────────────────────
 
-impl<BUS: I2c, C0, C1, C2, C3, C4, C5, C6, C7>
-    Ads7138<BUS, C0, C1, C2, C3, C4, C5, C6, C7>
+impl<BUS: I2c, CHIP: Chip, C0, C1, C2, C3, C4, C5, C6, C7>
+    Driver<BUS, CHIP, C0, C1, C2, C3, C4, C5, C6, C7>
 {
     /// Reset all registers to defaults. Consumes the driver and returns a fresh
     /// instance with all channels in the `Unconfigured` state.
-    pub async fn reset(mut self) -> Result<Ads7138<BUS>, BUS::Error> {
+    pub async fn reset(mut self) -> Result<Driver<BUS, CHIP>, BUS::Error> {
         self.device
             .general_cfg()
             .write_with_zero_async(|r| r.set_rst(true))
             .await?;
-        Ok(Ads7138 { device: self.device, _channels: core::marker::PhantomData })
+        Ok(Driver {
+            device: self.device,
+            _chip: core::marker::PhantomData,
+            _channels: core::marker::PhantomData,
+        })
     }
 
     /// Initiate ADC offset calibration. The `cal` bit auto-clears when complete.
@@ -177,7 +228,13 @@ impl<BUS: I2c, C0, C1, C2, C3, C4, C5, C6, C7>
         self.device.osr_cfg().modify_async(|r| r.set_osr(ratio)).await?;
         Ok(())
     }
+}
 
+// ── Global methods: HasStats chips (ADS7x38, ADS7x28) ────────────────────────
+
+impl<BUS: I2c, CHIP: HasStats, C0, C1, C2, C3, C4, C5, C6, C7>
+    Driver<BUS, CHIP, C0, C1, C2, C3, C4, C5, C6, C7>
+{
     /// Enable the digital window comparator.
     pub async fn enable_dwc(&mut self) -> Result<(), BUS::Error> {
         self.device.general_cfg().modify_async(|r| r.set_dwc_en(true)).await?;
@@ -249,6 +306,110 @@ impl<BUS: I2c, C0, C1, C2, C3, C4, C5, C6, C7>
     }
 }
 
+// ── Global methods: HasRmsZcd chips (ADS7x28) ────────────────────────────────
+
+impl<BUS: I2c, CHIP: HasRmsZcd, C0, C1, C2, C3, C4, C5, C6, C7>
+    Driver<BUS, CHIP, C0, C1, C2, C3, C4, C5, C6, C7>
+{
+    /// Configure the RMS computation module.
+    ///
+    /// `channel` selects which AIN is measured; `dc_sub` subtracts the DC
+    /// component before computing; `samples` sets the accumulation window.
+    /// Call `enable_dwc()` (which also enables the statistics module) before
+    /// reading results.
+    pub async fn configure_rms(
+        &mut self,
+        channel: RmsChannelId,
+        dc_sub: bool,
+        samples: RmsSampleCount,
+    ) -> Result<(), BUS::Error> {
+        self.device
+            .rms_cfg()
+            .write_with_zero_async(|r| {
+                r.set_rms_chid(channel);
+                r.set_rms_dc_sub(dc_sub);
+                r.set_rms_samples(samples);
+            })
+            .await?;
+        Ok(())
+    }
+
+    /// Read the 16-bit RMS result.
+    pub async fn read_rms(&mut self) -> Result<u16, BUS::Error> {
+        let lsb = self.device.rms_lsb().read_async().await?.value();
+        let msb = self.device.rms_msb().read_async().await?.value();
+        Ok(((msb as u16) << 8) | lsb as u16)
+    }
+
+    /// Configure the zero-crossing detection blanking time.
+    ///
+    /// `multiplier_8x`: false = 1× blanking, true = 8× blanking.
+    /// `blanking`: 7-bit blanking count value.
+    pub async fn configure_zcd_blanking(
+        &mut self,
+        multiplier_8x: bool,
+        blanking: u8,
+    ) -> Result<(), BUS::Error> {
+        self.device
+            .zcd_blanking_cfg()
+            .write_with_zero_async(|r| {
+                r.set_mult_en(multiplier_8x);
+                r.set_zcd_blanking(blanking & 0x7F);
+            })
+            .await?;
+        Ok(())
+    }
+
+    /// Set the GPO value driven on ZCD edge detection for channels 0–3.
+    pub async fn set_zcd_gpo_ch0_ch3(
+        &mut self,
+        ch0: ZcdGpoValue,
+        ch1: ZcdGpoValue,
+        ch2: ZcdGpoValue,
+        ch3: ZcdGpoValue,
+    ) -> Result<(), BUS::Error> {
+        self.device
+            .gpo_value_zcd_cfg_ch_0_ch_3()
+            .write_with_zero_async(|r| {
+                r.set_ch_0(ch0);
+                r.set_ch_1(ch1);
+                r.set_ch_2(ch2);
+                r.set_ch_3(ch3);
+            })
+            .await?;
+        Ok(())
+    }
+
+    /// Set the GPO value driven on ZCD edge detection for channels 4–7.
+    pub async fn set_zcd_gpo_ch4_ch7(
+        &mut self,
+        ch4: ZcdGpoValue,
+        ch5: ZcdGpoValue,
+        ch6: ZcdGpoValue,
+        ch7: ZcdGpoValue,
+    ) -> Result<(), BUS::Error> {
+        self.device
+            .gpo_value_zcd_cfg_ch_4_ch_7()
+            .write_with_zero_async(|r| {
+                r.set_ch_4(ch4);
+                r.set_ch_5(ch5);
+                r.set_ch_6(ch6);
+                r.set_ch_7(ch7);
+            })
+            .await?;
+        Ok(())
+    }
+
+    /// Set which GPO outputs are updated on zero-crossing detection (bit N = 1 enables GPO[N]).
+    pub async fn set_zcd_gpo_update_mask(&mut self, mask: u8) -> Result<(), BUS::Error> {
+        self.device
+            .gpo_zcd_update_en()
+            .write_with_zero_async(|r| r.set_gpo_zcd_update_en(mask))
+            .await?;
+        Ok(())
+    }
+}
+
 // ── Per-channel typestate impl ────────────────────────────────────────────────
 
 /// Generates configure/read/write impls for one channel.
@@ -260,22 +421,22 @@ impl<BUS: I2c, C0, C1, C2, C3, C4, C5, C6, C7>
 macro_rules! impl_channel {
     ($n:literal, ($($pre:ident),*), ($($post:ident),*)) => {
         pastey::paste! {
-            // ── configure (from any current mode) ────────────────────────────
+            // ── configure (from any current mode, any chip) ───────────────
 
-            impl<BUS: I2c, [<C $n>] $(, $pre)* $(, $post)*>
-                Ads7138<BUS, $($pre,)* [<C $n>], $($post,)*>
+            impl<BUS: I2c, CHIP: Chip, [<C $n>] $(, $pre)* $(, $post)*>
+                Driver<BUS, CHIP, $($pre,)* [<C $n>], $($post,)*>
             {
                 pub async fn [<configure_ch $n _as_analog>](mut self)
-                    -> Result<Ads7138<BUS, $($pre,)* AnalogIn, $($post,)*>, BUS::Error>
+                    -> Result<Driver<BUS, CHIP, $($pre,)* AnalogIn, $($post,)*>, BUS::Error>
                 {
                     self.device.pin_cfg().modify_async(|r| {
                         r.set_pin_cfg(r.pin_cfg() & !(1u8 << $n))
                     }).await?;
-                    Ok(Ads7138 { device: self.device, _channels: core::marker::PhantomData })
+                    Ok(Driver { device: self.device, _chip: core::marker::PhantomData, _channels: core::marker::PhantomData })
                 }
 
                 pub async fn [<configure_ch $n _as_digital_in>](mut self)
-                    -> Result<Ads7138<BUS, $($pre,)* DigitalIn, $($post,)*>, BUS::Error>
+                    -> Result<Driver<BUS, CHIP, $($pre,)* DigitalIn, $($post,)*>, BUS::Error>
                 {
                     self.device.pin_cfg().modify_async(|r| {
                         r.set_pin_cfg(r.pin_cfg() | (1u8 << $n))
@@ -283,11 +444,11 @@ macro_rules! impl_channel {
                     self.device.gpio_cfg().modify_async(|r| {
                         r.set_gpio_cfg(r.gpio_cfg() & !(1u8 << $n))
                     }).await?;
-                    Ok(Ads7138 { device: self.device, _channels: core::marker::PhantomData })
+                    Ok(Driver { device: self.device, _chip: core::marker::PhantomData, _channels: core::marker::PhantomData })
                 }
 
                 pub async fn [<configure_ch $n _as_digital_out_push_pull>](mut self)
-                    -> Result<Ads7138<BUS, $($pre,)* DigitalOut<PushPull>, $($post,)*>, BUS::Error>
+                    -> Result<Driver<BUS, CHIP, $($pre,)* DigitalOut<PushPull>, $($post,)*>, BUS::Error>
                 {
                     self.device.pin_cfg().modify_async(|r| {
                         r.set_pin_cfg(r.pin_cfg() | (1u8 << $n))
@@ -298,11 +459,11 @@ macro_rules! impl_channel {
                     self.device.gpo_drive_cfg().modify_async(|r| {
                         r.set_gpo_drive_cfg(r.gpo_drive_cfg() | (1u8 << $n))
                     }).await?;
-                    Ok(Ads7138 { device: self.device, _channels: core::marker::PhantomData })
+                    Ok(Driver { device: self.device, _chip: core::marker::PhantomData, _channels: core::marker::PhantomData })
                 }
 
                 pub async fn [<configure_ch $n _as_digital_out_open_drain>](mut self)
-                    -> Result<Ads7138<BUS, $($pre,)* DigitalOut<OpenDrain>, $($post,)*>, BUS::Error>
+                    -> Result<Driver<BUS, CHIP, $($pre,)* DigitalOut<OpenDrain>, $($post,)*>, BUS::Error>
                 {
                     self.device.pin_cfg().modify_async(|r| {
                         r.set_pin_cfg(r.pin_cfg() | (1u8 << $n))
@@ -313,21 +474,21 @@ macro_rules! impl_channel {
                     self.device.gpo_drive_cfg().modify_async(|r| {
                         r.set_gpo_drive_cfg(r.gpo_drive_cfg() & !(1u8 << $n))
                     }).await?;
-                    Ok(Ads7138 { device: self.device, _channels: core::marker::PhantomData })
+                    Ok(Driver { device: self.device, _chip: core::marker::PhantomData, _channels: core::marker::PhantomData })
                 }
             }
 
-            // ── AnalogIn: read ────────────────────────────────────────────────
+            // ── AnalogIn: SCL-stretch read (all chips) ────────────────────
 
-            impl<BUS: I2c $(, $pre)* $(, $post)*>
-                Ads7138<BUS, $($pre,)* AnalogIn, $($post,)*>
+            impl<BUS: I2c, CHIP: Chip $(, $pre)* $(, $post)*>
+                Driver<BUS, CHIP, $($pre,)* AnalogIn, $($post,)*>
             {
                 /// Trigger a conversion on channel $n via SCL stretching and return
                 /// the 12-bit result (0–4095).
                 ///
                 /// Note: SCL stretching can cause issues on some host controllers.
-                /// Prefer [`read_ch$n_polled`] if your I2C controller does not
-                /// support clock stretching.
+                /// Prefer [`read_ch$n_polled`] (ADS7x38/ADS7x28 only) if your
+                /// I2C controller does not support clock stretching.
                 pub async fn [<read_ch $n>](&mut self) -> Result<u16, BUS::Error> {
                     self.device.manual_ch_sel().write_async(|r| {
                         r.set_manual_chid(ChannelId::[<Ain $n>])
@@ -335,7 +496,13 @@ macro_rules! impl_channel {
                     let raw = self.device.interface.read_conversion_raw().await?;
                     Ok(raw >> 4)
                 }
+            }
 
+            // ── AnalogIn: polled read + thresholds (HasStats chips only) ──
+
+            impl<BUS: I2c, CHIP: HasStats $(, $pre)* $(, $post)*>
+                Driver<BUS, CHIP, $($pre,)* AnalogIn, $($post,)*>
+            {
                 /// Trigger a conversion on channel $n without SCL stretching and
                 /// return the 12-bit result (0–4095).
                 ///
@@ -343,34 +510,25 @@ macro_rules! impl_channel {
                 /// the conversion via CNVST, polls OSR_DONE, then reads the result
                 /// from the RECENT_CH$n registers.
                 pub async fn [<read_ch $n _polled>](&mut self) -> Result<u16, BUS::Error> {
-                    // Enable statistics and select the channel
                     self.device.general_cfg().modify_async(|r| r.set_stats_en(true)).await?;
                     self.device.manual_ch_sel().write_async(|r| {
                         r.set_manual_chid(ChannelId::[<Ain $n>])
                     }).await?;
-                    // Trigger conversion (no SCL stretching)
                     self.device.general_cfg().modify_async(|r| r.set_cnvst(true)).await?;
-                    // Poll until the conversion (and any oversampling) is complete
                     loop {
                         if self.device.system_status().read_async().await?.osr_done() {
                             break;
                         }
                     }
-                    // Clear the OSR_DONE flag (W1C)
                     self.device.system_status().write_with_zero_async(|r| {
                         r.set_osr_done(true)
                     }).await?;
-                    // Read the 12-bit result from the RECENT registers
-                    // MSB register holds bits [11:4]; upper nibble of LSB register holds bits [3:0]
                     let lsb = self.device.recent_ch_lsb($n).read_async().await?.value();
                     let msb = self.device.recent_ch_msb($n).read_async().await?.value();
                     Ok(((msb as u16) << 4) | ((lsb as u16) >> 4))
                 }
 
                 /// Set the high and low alert thresholds for channel $n (12-bit, 0–4095).
-                ///
-                /// The 12-bit value is split: upper 8 bits go to the `*_msb` register and
-                /// lower 4 bits are packed into the upper nibble of the adjacent register.
                 pub async fn [<set_ch $n _thresholds>](
                     &mut self,
                     high: u16,
@@ -421,20 +579,20 @@ macro_rules! impl_channel {
                 }
             }
 
-            // ── DigitalIn: read ───────────────────────────────────────────────
+            // ── DigitalIn: read (all chips) ───────────────────────────────
 
-            impl<BUS: I2c $(, $pre)* $(, $post)*>
-                Ads7138<BUS, $($pre,)* DigitalIn, $($post,)*>
+            impl<BUS: I2c, CHIP: Chip $(, $pre)* $(, $post)*>
+                Driver<BUS, CHIP, $($pre,)* DigitalIn, $($post,)*>
             {
                 pub async fn [<is_ch $n _high>](&mut self) -> Result<bool, BUS::Error> {
                     Ok(self.device.gpi_value().read_async().await?.gpi_value() & (1u8 << $n) != 0)
                 }
             }
 
-            // ── DigitalOut: write (open-drain or push-pull) ───────────────────
+            // ── DigitalOut: write (all chips) ─────────────────────────────
 
-            impl<BUS: I2c, D $(, $pre)* $(, $post)*>
-                Ads7138<BUS, $($pre,)* DigitalOut<D>, $($post,)*>
+            impl<BUS: I2c, CHIP: Chip, D $(, $pre)* $(, $post)*>
+                Driver<BUS, CHIP, $($pre,)* DigitalOut<D>, $($post,)*>
             {
                 pub async fn [<write_ch $n>](&mut self, high: bool) -> Result<(), BUS::Error> {
                     self.device.gpo_value().modify_async(|r| {
@@ -457,19 +615,11 @@ impl_channel!(5, (C0, C1, C2, C3, C4),       (C6, C7));
 impl_channel!(6, (C0, C1, C2, C3, C4, C5),   (C7));
 impl_channel!(7, (C0, C1, C2, C3, C4, C5, C6), ());
 
-// ── Chip aliases ──────────────────────────────────────────────────────────────
+// ── Per-part-number type aliases ──────────────────────────────────────────────
 
-/// The ADS7128 is register-compatible with the ADS7138 and is supported by
-/// this driver. Use [`Ads7138::new`] to construct, or name the binding as
-/// `Ads7128` for clarity.
-pub type Ads7128<
-    BUS,
-    C0 = Unconfigured,
-    C1 = Unconfigured,
-    C2 = Unconfigured,
-    C3 = Unconfigured,
-    C4 = Unconfigured,
-    C5 = Unconfigured,
-    C6 = Unconfigured,
-    C7 = Unconfigured,
-> = Ads7138<BUS, C0, C1, C2, C3, C4, C5, C6, C7>;
+pub type Tla2528<BUS, C0 = Unconfigured, C1 = Unconfigured, C2 = Unconfigured, C3 = Unconfigured, C4 = Unconfigured, C5 = Unconfigured, C6 = Unconfigured, C7 = Unconfigured> = Driver<BUS, Tla252x, C0, C1, C2, C3, C4, C5, C6, C7>;
+pub type Tla2518<BUS, C0 = Unconfigured, C1 = Unconfigured, C2 = Unconfigured, C3 = Unconfigured, C4 = Unconfigured, C5 = Unconfigured, C6 = Unconfigured, C7 = Unconfigured> = Driver<BUS, Tla252x, C0, C1, C2, C3, C4, C5, C6, C7>;
+pub type Ads7138<BUS, C0 = Unconfigured, C1 = Unconfigured, C2 = Unconfigured, C3 = Unconfigured, C4 = Unconfigured, C5 = Unconfigured, C6 = Unconfigured, C7 = Unconfigured> = Driver<BUS, Ads7x38, C0, C1, C2, C3, C4, C5, C6, C7>;
+pub type Ads7038<BUS, C0 = Unconfigured, C1 = Unconfigured, C2 = Unconfigured, C3 = Unconfigured, C4 = Unconfigured, C5 = Unconfigured, C6 = Unconfigured, C7 = Unconfigured> = Driver<BUS, Ads7x38, C0, C1, C2, C3, C4, C5, C6, C7>;
+pub type Ads7128<BUS, C0 = Unconfigured, C1 = Unconfigured, C2 = Unconfigured, C3 = Unconfigured, C4 = Unconfigured, C5 = Unconfigured, C6 = Unconfigured, C7 = Unconfigured> = Driver<BUS, Ads7x28, C0, C1, C2, C3, C4, C5, C6, C7>;
+pub type Ads7028<BUS, C0 = Unconfigured, C1 = Unconfigured, C2 = Unconfigured, C3 = Unconfigured, C4 = Unconfigured, C5 = Unconfigured, C6 = Unconfigured, C7 = Unconfigured> = Driver<BUS, Ads7x28, C0, C1, C2, C3, C4, C5, C6, C7>;

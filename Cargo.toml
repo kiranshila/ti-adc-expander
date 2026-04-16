@@ -1,11 +1,11 @@
 [package]
-name = "ads7138"
+name = "ti-adc-expander"
 version = "0.1.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
-description = "Async embedded-hal driver for the TI ADS7128/ADS7138 12-bit 8-channel I2C ADC"
-repository = "https://github.com/kiranshila/ads7138"
-keywords = ["ads7138", "ads7128", "adc", "i2c", "embedded-hal"]
+description = "Async embedded-hal driver for the TI TLA2518/2528, ADS7038/7138, and ADS7028/7128 12-bit 8-channel ADC+GPIO expanders"
+repository = "https://github.com/kiranshila/ti-adc-expander"
+keywords = ["ads7138", "ads7128", "tla2528", "adc", "embedded-hal"]
 categories = ["embedded", "no-std", "hardware-support"]
 
 [dependencies]

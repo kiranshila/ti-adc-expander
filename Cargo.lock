@@ -3,16 +3,6 @@
 version = 4
 
 [[package]]
-name = "ads7138"
-version = "0.1.0"
-dependencies = [
- "defmt 1.0.1",
- "device-driver",
- "embedded-hal-async",
- "pastey",
-]
-
-[[package]]
 name = "ahash"
 version = "0.8.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -447,6 +437,16 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "ti-adc-expander"
+version = "0.1.0"
+dependencies = [
+ "defmt 1.0.1",
+ "device-driver",
+ "embedded-hal-async",
+ "pastey",
 ]
 
 [[package]]
