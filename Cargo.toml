@@ -15,7 +15,7 @@ embedded-hal-async = "1"
 pastey = "0.2"
 
 [features]
-default = ["defmt"]
+default = []
 defmt = ["dep:defmt", "embedded-hal-async/defmt-03"]
 
 [lib]

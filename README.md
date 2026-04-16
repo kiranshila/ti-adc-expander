@@ -17,7 +17,7 @@ error type directly — no wrapper enum.
   - SCL-stretch read (one I2C transaction, uses clock stretching)
   - Polled read (no clock stretching; uses `CNVST` + `OSR_DONE` polling)
 - Full register access via the `device` field for anything not covered by the high-level API
-- Optional `defmt` support via the `defmt` feature (enabled by default)
+- Optional `defmt` support via the `defmt` feature
 
 ## Cargo.toml
 
@@ -26,10 +26,10 @@ error type directly — no wrapper enum.
 ads7138 = "0.1"
 ```
 
-To disable `defmt`:
+To enable `defmt`:
 
 ```toml
-ads7138 = { version = "0.1", default-features = false }
+ads7138 = { version = "0.1", features = ["defmt"] }
 ```
 
 ## I2C address
