@@ -1,0 +1,778 @@
+config:
+  register_address_type: u8
+  defmt_feature: defmt
+
+SystemStatus:
+  type: register
+  address: 0x00
+  size_bits: 8
+  access: RW
+  reset_value: 0x81
+  description: System status and error flags.
+  fields:
+    seq_status:
+      base: bool
+      start: 6
+      access: RO
+      description: Channel sequencer running (true = sequence in progress).
+    i2c_speed:
+      base: bool
+      start: 5
+      access: RO
+      description: I2C high-speed mode active.
+    osr_done:
+      base: bool
+      start: 3
+      description: Oversampling complete. Write 1 to clear.
+    crc_err_fuse:
+      base: bool
+      start: 2
+      access: RO
+      description: Power-up CRC error; device configuration not loaded correctly.
+    crc_err_in:
+      base: bool
+      start: 1
+      description: CRC error on incoming data. Write 1 to clear. Blocks register writes until cleared.
+    bor:
+      base: bool
+      start: 0
+      description: Brown-out reset indicator. Write 1 to clear. Set on every power-up.
+
+GeneralCfg:
+  type: register
+  address: 0x01
+  size_bits: 8
+  access: RW
+  reset_value: 0x00
+  description: General device configuration.
+  fields:
+    crc_en:
+      base: bool
+      start: 6
+      description: Enable CRC appended to output data and CRC check on incoming data.
+    stats_en:
+      base: bool
+      start: 5
+      description: Enable statistics module; clears and updates MAX/MIN/RECENT registers.
+    dwc_en:
+      base: bool
+      start: 4
+      description: Enable digital window comparator.
+    cnvst:
+      base: bool
+      start: 3
+      access: WO
+      description: Write 1 to initiate conversion immediately without SCL stretching.
+    ch_rst:
+      base: bool
+      start: 2
+      description: Force all channels to analog inputs regardless of PIN_CFG/GPIO_CFG.
+    cal:
+      base: bool
+      start: 1
+      description: Write 1 to initiate ADC offset calibration; auto-clears when complete.
+    rst:
+      base: bool
+      start: 0
+      access: WO
+      description: Write 1 to reset all registers to defaults.
+
+DataCfg:
+  type: register
+  address: 0x02
+  size_bits: 8
+  access: RW
+  reset_value: 0x00
+  description: Output data format configuration.
+  fields:
+    fix_pat:
+      base: bool
+      start: 7
+      description: Output fixed debug code 0xA5A instead of ADC conversion data.
+    append_status:
+      base: uint
+      start: 4
+      end: 6
+      description: Append 4-bit channel ID or status flags to ADC output data.
+      conversion:
+        name: AppendStatus
+        None: 0
+        ChannelId: 1
+        StatusFlags: 2
+        Reserved: "catch_all"
+
+OsrCfg:
+  type: register
+  address: 0x03
+  size_bits: 8
+  access: RW
+  reset_value: 0x00
+  description: Oversampling ratio configuration.
+  fields:
+    osr:
+      base: uint
+      start: 0
+      end: 3
+      description: Number of samples averaged per conversion result.
+      conversion:
+        name: OversamplingRatio
+        Osr1: 0
+        Osr2: 1
+        Osr4: 2
+        Osr8: 3
+        Osr16: 4
+        Osr32: 5
+        Osr64: 6
+        Osr128: 7
+
+OpmodeCfg:
+  type: register
+  address: 0x04
+  size_bits: 8
+  access: RW
+  reset_value: 0x00
+  description: Operating mode, oscillator selection, and autonomous-mode clock divider.
+  fields:
+    conv_on_err:
+      base: bool
+      start: 7
+      description: On CRC error in autonomous mode, pause sequencing and force channels to analog inputs.
+    conv_mode:
+      base: uint
+      start: 5
+      end: 7
+      description: Conversion initiation mode.
+      conversion:
+        name: ConvMode
+        Manual: 0
+        Autonomous: 1
+        Reserved: "catch_all"
+    osc_sel:
+      base: bool
+      start: 4
+      description: Oscillator select (false = high-speed, true = low-power).
+    clk_div:
+      base: uint
+      start: 0
+      end: 4
+      description: Clock divider for autonomous-mode sampling rate.
+
+PinCfg:
+  type: register
+  address: 0x05
+  size_bits: 8
+  access: RW
+  reset_value: 0x00
+  description: Per-channel function select (bit N = 0 → AIN, bit N = 1 → GPIO).
+  fields:
+    pin_cfg:
+      base: uint
+      start: 0
+      end: 8
+
+GpioCfg:
+  type: register
+  address: 0x07
+  size_bits: 8
+  access: RW
+  reset_value: 0x00
+  description: GPIO direction (bit N = 0 → input, bit N = 1 → output). Only applies to pins set as GPIO in PinCfg.
+  fields:
+    gpio_cfg:
+      base: uint
+      start: 0
+      end: 8
+
+GpoDriveCfg:
+  type: register
+  address: 0x09
+  size_bits: 8
+  access: RW
+  reset_value: 0x00
+  description: GPO driver type (bit N = 0 → open-drain, bit N = 1 → push-pull).
+  fields:
+    gpo_drive_cfg:
+      base: uint
+      start: 0
+      end: 8
+
+GpoValue:
+  type: register
+  address: 0x0B
+  size_bits: 8
+  access: RW
+  reset_value: 0x00
+  description: Logic level to drive on GPO outputs (bit N = 1 → high).
+  fields:
+    gpo_value:
+      base: uint
+      start: 0
+      end: 8
+
+GpiValue:
+  type: register
+  address: 0x0D
+  size_bits: 8
+  access: RO
+  reset_value: 0x00
+  description: GPI input logic level readback (bit N reflects GPIO[N]).
+  fields:
+    gpi_value:
+      base: uint
+      start: 0
+      end: 8
+
+ZcdBlankingCfg:
+  type: register
+  address: 0x0F
+  size_bits: 8
+  access: RW
+  reset_value: 0x00
+  description: Zero-crossing detection blanking time configuration.
+  fields:
+    mult_en:
+      base: bool
+      start: 7
+      description: Blanking time multiplier (false = 1×, true = 8×).
+    zcd_blanking:
+      base: uint
+      start: 0
+      end: 7
+      description: Blanking time value (7-bit).
+
+SequenceCfg:
+  type: register
+  address: 0x10
+  size_bits: 8
+  access: RW
+  reset_value: 0x00
+  description: Channel sequencer mode and start/stop control.
+  fields:
+    seq_start:
+      base: bool
+      start: 4
+      description: Start (true) or stop (false) the auto-sequence.
+    seq_mode:
+      base: uint
+      start: 0
+      end: 2
+      description: Scanning mode selection.
+      conversion:
+        name: SeqMode
+        Manual: 0
+        AutoSequence: 1
+        Reserved: "catch_all"
+
+ManualChSel:
+  type: register
+  address: 0x11
+  size_bits: 8
+  access: RW
+  reset_value: 0x00
+  description: Channel ID for next conversion in manual mode.
+  fields:
+    manual_chid:
+      base: uint
+      start: 0
+      end: 4
+      description: Target channel (0–7 = AIN0–AIN7; channel must not be configured as GPIO).
+      conversion:
+        name: ChannelId
+        Ain0: 0
+        Ain1: 1
+        Ain2: 2
+        Ain3: 3
+        Ain4: 4
+        Ain5: 5
+        Ain6: 6
+        Ain7: 7
+        Reserved: "catch_all"
+
+AutoSeqChSel:
+  type: register
+  address: 0x12
+  size_bits: 8
+  access: RW
+  reset_value: 0x00
+  description: Channel enable bitmask for auto-sequence (bit N = 1 includes AIN[N]).
+  fields:
+    auto_seq_ch_sel:
+      base: uint
+      start: 0
+      end: 8
+
+AlertChSel:
+  type: register
+  address: 0x14
+  size_bits: 8
+  access: RW
+  reset_value: 0x00
+  description: Channel alert enable for ALERT pin assertion (bit N = 1 enables CH[N]).
+  fields:
+    alert_ch_sel:
+      base: uint
+      start: 0
+      end: 8
+
+AlertFuncSel:
+  type: register
+  address: 0x16
+  size_bits: 8
+  access: RW
+  reset_value: 0x00
+  description: Map CRC error condition to ALERT pin.
+  fields:
+    alert_crcin:
+      base: bool
+      start: 0
+      description: Assert ALERT pin when CRC_ERR_IN is set.
+
+AlertPinCfg:
+  type: register
+  address: 0x17
+  size_bits: 8
+  access: RW
+  reset_value: 0x00
+  description: ALERT pin driver type and assertion polarity/mode.
+  fields:
+    alert_drive:
+      base: bool
+      start: 2
+      description: ALERT driver type (false = open-drain, true = push-pull).
+    alert_logic:
+      base: uint
+      start: 0
+      end: 2
+      description: ALERT assertion behavior.
+      conversion:
+        name: AlertLogic
+        ActiveLow: 0
+        ActiveHigh: 1
+        PulsedLow: 2
+        PulsedHigh: 3
+
+EventFlag:
+  type: register
+  address: 0x18
+  size_bits: 8
+  access: RO
+  reset_value: 0x00
+  description: Combined alert event flags (OR of EventHighFlag and EventLowFlag per channel).
+  fields:
+    event_flag:
+      base: uint
+      start: 0
+      end: 8
+      description: Bit N = 1 indicates a pending alert event on CH[N].
+
+EventHighFlag:
+  type: register
+  address: 0x1A
+  size_bits: 8
+  access: RW
+  reset_value: 0x00
+  description: High-threshold (analog) or logic-1 (digital) alert flags. Write 1 to clear.
+  fields:
+    event_high_flag:
+      base: uint
+      start: 0
+      end: 8
+      description: Bit N = 1 indicates a high alert on CH[N].
+
+EventLowFlag:
+  type: register
+  address: 0x1C
+  size_bits: 8
+  access: RW
+  reset_value: 0x00
+  description: Low-threshold (analog) or logic-0 (digital) alert flags. Write 1 to clear.
+  fields:
+    event_low_flag:
+      base: uint
+      start: 0
+      end: 8
+      description: Bit N = 1 indicates a low alert on CH[N].
+
+EventRgn:
+  type: register
+  address: 0x1E
+  size_bits: 8
+  access: RW
+  reset_value: 0x00
+  description: Alert region selection per channel (bit N = 0 → out-of-window, bit N = 1 → in-window).
+  fields:
+    event_rgn:
+      base: uint
+      start: 0
+      end: 8
+
+# Per-channel threshold/hysteresis registers.
+# Four registers per channel, stride 4, channels 0–7.
+# Full 12-bit thresholds are split: MSB[7:0] in the _Th_ register,
+# LSB[3:0] packed into the upper nibble of the adjacent register.
+
+HysteresisCh:
+  type: register
+  address: 0x20
+  size_bits: 8
+  access: RW
+  reset_value: 0xF0
+  repeat:
+    count: 8
+    stride: 4
+  description: "High-threshold lower 4 bits [bits 7:4] and 4-bit hysteresis value [bits 3:0] for channel N."
+  fields:
+    high_threshold_lsb:
+      base: uint
+      start: 4
+      end: 8
+      description: Bits [3:0] of the 12-bit high threshold (combined with HighThCh for full value).
+    hysteresis:
+      base: uint
+      start: 0
+      end: 4
+      description: Hysteresis applied to both thresholds; effective value is this field left-shifted by 3.
+
+HighThCh:
+  type: register
+  address: 0x21
+  size_bits: 8
+  access: RW
+  reset_value: 0xFF
+  repeat:
+    count: 8
+    stride: 4
+  description: High-threshold upper 8 bits [bits 11:4] for channel N.
+  fields:
+    high_threshold_msb:
+      base: uint
+      start: 0
+      end: 8
+
+EventCountCh:
+  type: register
+  address: 0x22
+  size_bits: 8
+  access: RW
+  reset_value: 0x00
+  repeat:
+    count: 8
+    stride: 4
+  description: "Low-threshold lower 4 bits [bits 7:4] and event counter threshold [bits 3:0] for channel N."
+  fields:
+    low_threshold_lsb:
+      base: uint
+      start: 4
+      end: 8
+      description: Bits [3:0] of the 12-bit low threshold (combined with LowThCh for full value).
+    event_count:
+      base: uint
+      start: 0
+      end: 4
+      description: Alert fires after (event_count + 1) consecutive threshold violations.
+
+LowThCh:
+  type: register
+  address: 0x23
+  size_bits: 8
+  access: RW
+  reset_value: 0x00
+  repeat:
+    count: 8
+    stride: 4
+  description: Low-threshold upper 8 bits [bits 11:4] for channel N.
+  fields:
+    low_threshold_msb:
+      base: uint
+      start: 0
+      end: 8
+
+# Statistics registers (read-only). Requires STATS_EN=1 in GeneralCfg to update.
+# MAX resets to 0x00 on read; MIN resets to 0xFF on read.
+# 16-bit value split across LSB (lower byte) and MSB (upper byte) registers.
+
+MaxChLsb:
+  type: register
+  address: 0x60
+  size_bits: 8
+  access: RO
+  reset_value: 0x00
+  repeat:
+    count: 8
+    stride: 2
+  description: Maximum ADC result lower byte for channel N. Resets to 0x00 after read.
+  fields:
+    value:
+      base: uint
+      start: 0
+      end: 8
+
+MaxChMsb:
+  type: register
+  address: 0x61
+  size_bits: 8
+  access: RO
+  reset_value: 0x00
+  repeat:
+    count: 8
+    stride: 2
+  description: Maximum ADC result upper byte for channel N. Resets to 0x00 after read.
+  fields:
+    value:
+      base: uint
+      start: 0
+      end: 8
+
+MinChLsb:
+  type: register
+  address: 0x80
+  size_bits: 8
+  access: RO
+  reset_value: 0xFF
+  repeat:
+    count: 8
+    stride: 2
+  description: Minimum ADC result lower byte for channel N. Resets to 0xFF after read.
+  fields:
+    value:
+      base: uint
+      start: 0
+      end: 8
+
+MinChMsb:
+  type: register
+  address: 0x81
+  size_bits: 8
+  access: RO
+  reset_value: 0xFF
+  repeat:
+    count: 8
+    stride: 2
+  description: Minimum ADC result upper byte for channel N. Resets to 0xFF after read.
+  fields:
+    value:
+      base: uint
+      start: 0
+      end: 8
+
+RecentChLsb:
+  type: register
+  address: 0xA0
+  size_bits: 8
+  access: RO
+  reset_value: 0x00
+  repeat:
+    count: 8
+    stride: 2
+  description: Most-recent ADC result lower byte for channel N.
+  fields:
+    value:
+      base: uint
+      start: 0
+      end: 8
+
+RecentChMsb:
+  type: register
+  address: 0xA1
+  size_bits: 8
+  access: RO
+  reset_value: 0x00
+  repeat:
+    count: 8
+    stride: 2
+  description: Most-recent ADC result upper byte for channel N.
+  fields:
+    value:
+      base: uint
+      start: 0
+      end: 8
+
+RmsCfg:
+  type: register
+  address: 0xC0
+  size_bits: 8
+  access: RW
+  reset_value: 0x00
+  description: RMS calculation channel, DC subtraction, and sample-count configuration.
+  fields:
+    rms_chid:
+      base: uint
+      start: 4
+      end: 8
+      description: Channel to compute RMS on.
+      conversion:
+        name: RmsChannelId
+        Ain0: 0
+        Ain1: 1
+        Ain2: 2
+        Ain3: 3
+        Ain4: 4
+        Ain5: 5
+        Ain6: 6
+        Ain7: 7
+        Reserved: "catch_all"
+    rms_dc_sub:
+      base: bool
+      start: 2
+      description: Subtract DC component before computing RMS.
+    rms_samples:
+      base: uint
+      start: 0
+      end: 2
+      description: Number of samples used for RMS accumulation.
+      conversion:
+        name: RmsSampleCount
+        Samples1024: 0
+        Samples4096: 1
+        Samples16384: 2
+        Samples65536: 3
+
+RmsLsb:
+  type: register
+  address: 0xC1
+  size_bits: 8
+  access: RO
+  reset_value: 0x00
+  description: RMS result lower byte.
+  fields:
+    value:
+      base: uint
+      start: 0
+      end: 8
+
+RmsMsb:
+  type: register
+  address: 0xC2
+  size_bits: 8
+  access: RO
+  reset_value: 0x00
+  description: RMS result upper byte.
+  fields:
+    value:
+      base: uint
+      start: 0
+      end: 8
+
+# GPO trigger event select: one register per GPO output, stride 2.
+# Bit M = 1 enables AIN[M] alert events to trigger an update of GPO[N].
+# GPO_TRIGGER_CFG must also enable the GPO for trigger-based updates.
+GpoTrigEventSel:
+  type: register
+  address: 0xC3
+  size_bits: 8
+  access: RW
+  reset_value: 0x02
+  repeat:
+    count: 8
+    stride: 2
+  description: Alert-event source bitmask for trigger-based update of GPO[N].
+  fields:
+    trig_event_sel:
+      base: uint
+      start: 0
+      end: 8
+
+GpoValueZcdCfgCh0Ch3:
+  type: register
+  address: 0xE3
+  size_bits: 8
+  access: RW
+  reset_value: 0x00
+  description: GPO output value on zero-crossing event for channels 0–3 (2 bits per channel).
+  fields:
+    ch3:
+      base: uint
+      start: 6
+      end: 8
+      description: GPO value driven on rising/falling ZCD edge for CH3.
+      conversion: "crate::ZcdGpoValue"
+    ch2:
+      base: uint
+      start: 4
+      end: 6
+      description: GPO value driven on rising/falling ZCD edge for CH2.
+      conversion: "crate::ZcdGpoValue"
+    ch1:
+      base: uint
+      start: 2
+      end: 4
+      description: GPO value driven on rising/falling ZCD edge for CH1.
+      conversion: "crate::ZcdGpoValue"
+    ch0:
+      base: uint
+      start: 0
+      end: 2
+      description: GPO value driven on rising/falling ZCD edge for CH0.
+      conversion: "crate::ZcdGpoValue"
+
+GpoValueZcdCfgCh4Ch7:
+  type: register
+  address: 0xE4
+  size_bits: 8
+  access: RW
+  reset_value: 0x00
+  description: GPO output value on zero-crossing event for channels 4–7 (2 bits per channel).
+  fields:
+    ch7:
+      base: uint
+      start: 6
+      end: 8
+      description: GPO value driven on rising/falling ZCD edge for CH7.
+      conversion: "crate::ZcdGpoValue"
+    ch6:
+      base: uint
+      start: 4
+      end: 6
+      description: GPO value driven on rising/falling ZCD edge for CH6.
+      conversion: "crate::ZcdGpoValue"
+    ch5:
+      base: uint
+      start: 2
+      end: 4
+      description: GPO value driven on rising/falling ZCD edge for CH5.
+      conversion: "crate::ZcdGpoValue"
+    ch4:
+      base: uint
+      start: 0
+      end: 2
+      description: GPO value driven on rising/falling ZCD edge for CH4.
+      conversion: "crate::ZcdGpoValue"
+
+GpoZcdUpdateEn:
+  type: register
+  address: 0xE7
+  size_bits: 8
+  access: RW
+  reset_value: 0x00
+  description: Enable GPO update on zero-crossing detection (bit N = 1 enables GPO[N]).
+  fields:
+    gpo_zcd_update_en:
+      base: uint
+      start: 0
+      end: 8
+
+GpoTriggerCfg:
+  type: register
+  address: 0xE9
+  size_bits: 8
+  access: RW
+  reset_value: 0x00
+  description: Enable trigger-based GPO updates from alert events (bit N = 1 enables GPO[N]).
+  fields:
+    gpo_trigger_update_en:
+      base: uint
+      start: 0
+      end: 8
+
+GpoValueTrig:
+  type: register
+  address: 0xEB
+  size_bits: 8
+  access: RW
+  reset_value: 0x00
+  description: Logic level to drive on each GPO when its trigger event fires (bit N = 1 → high).
+  fields:
+    gpo_value_on_trigger:
+      base: uint
+      start: 0
+      end: 8

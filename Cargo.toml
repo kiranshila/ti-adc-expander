@@ -1,0 +1,19 @@
+[package]
+name = "ads7138"
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+device-driver = { version = "1", default-features = false, features = ["yaml"] }
+defmt = { version = "1", optional = true }
+embedded-hal-async = "1"
+pastey = "0.2"
+
+[features]
+default = ["defmt"]
+defmt = ["dep:defmt"]
+
+[lib]
+test = false
+bench = false
