@@ -207,7 +207,7 @@ to `Unconfigured`, preserving the chip type:
 
 ```rust
 let adc = adc.reset().await?;
-// adc is now Ads7138<BUS> — all channel type params are Unconfigured
+// adc is now Ads7138<I2C> — all channel type params are Unconfigured
 ```
 
 ## Direct register access

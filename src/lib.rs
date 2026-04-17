@@ -183,8 +183,17 @@ impl<SPI: SpiDevice> AsyncRegisterInterface for SpiInterface<SPI> {
 //   OSR = 0 (no averaging): 12-bit result in bits [15:4]; bits [3:0] = 0.
 //   OSR > 0 (averaging):    full 16-bit result in bits [15:0].
 
+/// Low-level trait for raw ADC output frame reads.
+///
+/// Implemented by [`I2cInterface`] (SCL-stretch conversion) and [`SpiInterface`]
+/// (on-the-fly mode, §7.4.3). Implement this for custom bus wrappers.
+///
+/// The returned `u16` is MSB-aligned:
+/// - OSR = 0: 12-bit result in bits [15:4]; bits [3:0] = 0.
+/// - OSR > 0: full 16-bit averaged result in bits [15:0].
 #[allow(async_fn_in_trait)]
 pub trait CanConvert: AsyncRegisterInterface<AddressType = u8> {
+    /// Select `channel` (0–7) and return the raw 16-bit MSB-aligned ADC word.
     async fn read_conversion_raw(&mut self, channel: u8) -> Result<u16, Self::Error>;
 }
 
@@ -212,15 +221,26 @@ impl<SPI: SpiDevice> CanConvert for SpiInterface<SPI> {
 
 // ── Channel mode types ────────────────────────────────────────────────────────
 
+/// Channel has not yet been configured.
 pub struct Unconfigured;
+/// Channel configured as an analog input.
 pub struct AnalogIn;
+/// Channel configured as a digital input (GPIO).
 pub struct DigitalIn;
+/// Channel configured as a digital output (GPIO). `DRIVE` is [`PushPull`] or [`OpenDrain`].
 pub struct DigitalOut<DRIVE>(core::marker::PhantomData<DRIVE>);
+/// Open-drain drive mode for [`DigitalOut`].
 pub struct OpenDrain;
+/// Push-pull drive mode for [`DigitalOut`].
 pub struct PushPull;
 
 // ── Driver struct ─────────────────────────────────────────────────────────────
 
+/// Core driver generic over bus interface (`IF`), chip capability tier (`CHIP`),
+/// and the typestate of each of the 8 channels (`C0`–`C7`).
+///
+/// Use the part-number type aliases (`Ads7138<I2C>`, `Ads7038<SPI>`, etc.)
+/// rather than constructing this type directly.
 pub struct Driver<
     IF,
     CHIP,

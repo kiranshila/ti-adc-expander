@@ -7,6 +7,7 @@ description = "Async embedded-hal driver for the TI TLA2518/2528, ADS7038/7138, 
 repository = "https://github.com/kiranshila/ti-adc-expander"
 keywords = ["ads7138", "ads7128", "tla2528", "ads7028", "adc"]
 categories = ["embedded", "no-std", "hardware-support"]
+exclude = [".envrc", "flake.nix", "flake.lock", "*.h"]
 
 [dependencies]
 device-driver = { version = "1", default-features = false, features = ["yaml"] }
