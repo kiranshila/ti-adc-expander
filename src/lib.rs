@@ -1,4 +1,5 @@
 #![no_std]
+#![doc = include_str!("../README.md")]
 
 use device_driver::AsyncRegisterInterface;
 use embedded_hal_async::{i2c::I2c, spi::SpiDevice};
