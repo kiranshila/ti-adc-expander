@@ -39,8 +39,8 @@ bus error type directly — no wrapper enum.
     `CNVST`, polls `OSR_DONE`, reads from `RECENT_CHx` statistics registers —
     no clock stretching, works on both I²C and SPI
 - Both read methods return a raw 16-bit MSB-aligned word:
-  - OSR = 0 (no averaging): 12-bit result in bits [15:4]; bits [3:0] = 0
-  - OSR > 0 (averaging): full 16-bit result in bits [15:0]
+  - OSR = 0 (no averaging): 12-bit result in bits \[15:4\]; bits \[3:0\] = 0
+  - OSR > 0 (averaging): full 16-bit result in bits \[15:0\]
 - Full register access via the `device` field for anything not covered by the API
 - Optional `defmt` support via the `defmt` feature
 
@@ -92,9 +92,10 @@ The device address is set by resistors on the `ADDR` pin (I²C parts only):
 
 ### I²C
 
-```rust,ignore
-use ti_adc_expander::{Ads7138, Address, OversamplingRatio};
-
+```rust,no_run
+# use embedded_hal_async::i2c::I2c;
+# use ti_adc_expander::{Ads7138, Address, OversamplingRatio};
+# async fn example<I: I2c>(i2c: I) -> Result<(), I::Error> {
 // Create the driver — all channels start as `Unconfigured`
 let mut adc = Ads7138::new(i2c, Address::X10);
 
@@ -119,13 +120,17 @@ let raw: u16 = adc.read_ch0_polled().await?;
 // Digital I/O
 let high: bool = adc.is_ch2_high().await?;
 adc.write_ch3(true).await?;
+# let _ = (raw, high);
+# Ok(())
+# }
 ```
 
 ### SPI
 
-```rust,ignore
-use ti_adc_expander::{Ads7038, OversamplingRatio};
-
+```rust,no_run
+# use embedded_hal_async::spi::SpiDevice;
+# use ti_adc_expander::Ads7038;
+# async fn example<S: SpiDevice>(spi: S) -> Result<(), S::Error> {
 // SPI driver — no address needed
 let mut adc = Ads7038::new(spi);
 
@@ -138,14 +143,17 @@ let raw: u16 = adc.read_ch0().await?;    // 16-bit MSB-aligned; >> 4 for 12-bit
 
 // Read via statistics registers (ADS7x38 / ADS7x28 only)
 let raw: u16 = adc.read_ch0_polled().await?;
+# let _ = raw;
+# Ok(())
+# }
 ```
 
 ## Analog reads
 
 Both methods return a raw 16-bit MSB-aligned word. With OSR = 0 (no averaging)
-the 12-bit result occupies bits [15:4] and bits [3:0] are zero — shift right by 4
+the 12-bit result occupies bits \[15:4\] and bits \[3:0\] are zero — shift right by 4
 to get a value in 0–4095. With OSR > 0 (averaging enabled) the full 16-bit result
-occupies bits [15:0].
+occupies bits \[15:0\].
 
 **`read_chN`** (all chips):
 - I²C: bare `read` causes the device to stretch SCL while converting
@@ -160,7 +168,11 @@ lacks the statistics register block.
 
 ## Alert thresholds (ADS7x38 / ADS7x28)
 
-```rust,ignore
+```rust,no_run
+# use embedded_hal_async::i2c::I2c;
+# use ti_adc_expander::{Ads7138, Address, AlertLogic};
+# async fn example<I: I2c>(i2c: I) -> Result<(), I::Error> {
+# let mut adc = Ads7138::new(i2c, Address::X10).configure_ch0_as_analog().await?;
 // Set 12-bit high/low thresholds for channel 0
 adc.set_ch0_thresholds(3000, 500).await?;
 adc.set_ch0_hysteresis(4).await?;       // effective = 4 << 3 LSBs
@@ -173,13 +185,16 @@ adc.configure_alert_pin(false, AlertLogic::ActiveLow).await?;
 // Read and clear flags
 let highs = adc.event_high_flags().await?;
 adc.clear_event_high_flags(highs).await?;
+# Ok(())
+# }
 ```
 
 ## RMS and ZCD (ADS7x28 only)
 
-```rust,ignore
-use ti_adc_expander::{Ads7128, RmsChannelId, RmsSampleCount};
-
+```rust,no_run
+# use embedded_hal_async::i2c::I2c;
+# use ti_adc_expander::{Ads7128, Address, RmsChannelId, RmsSampleCount, ZcdGpoValue};
+# async fn example<I: I2c>(i2c: I) -> Result<(), I::Error> {
 let mut adc = Ads7128::new(i2c, Address::X10);
 
 // Enable statistics (required for RMS)
@@ -198,6 +213,9 @@ adc.set_zcd_gpo_ch0_ch3(
     ZcdGpoValue::Rise0Fall0,
 ).await?;
 adc.set_zcd_gpo_update_mask(0b0000_0001).await?;
+# let _ = rms;
+# Ok(())
+# }
 ```
 
 ## Reset
@@ -205,9 +223,16 @@ adc.set_zcd_gpo_update_mask(0b0000_0001).await?;
 `reset()` issues a soft reset and returns a fresh driver with all channels back
 to `Unconfigured`, preserving the chip type:
 
-```rust,ignore
+```rust,no_run
+# use embedded_hal_async::i2c::I2c;
+# use ti_adc_expander::{Ads7138, Address};
+# async fn example<I: I2c>(i2c: I) -> Result<(), I::Error> {
+# let adc = Ads7138::new(i2c, Address::X10);
 let adc = adc.reset().await?;
 // adc is now Ads7138<I2C> — all channel type params are Unconfigured
+# let _ = adc;
+# Ok(())
+# }
 ```
 
 ## Direct register access
@@ -215,7 +240,11 @@ let adc = adc.reset().await?;
 The `device` field exposes the full register map for anything not covered by the
 high-level API:
 
-```rust,ignore
+```rust,no_run
+# use embedded_hal_async::i2c::I2c;
+# use ti_adc_expander::{Ads7138, Address, ConvMode, SeqMode};
+# async fn example<I: I2c>(i2c: I) -> Result<(), I::Error> {
+# let mut adc = Ads7138::new(i2c, Address::X10);
 adc.device.opmode_cfg().modify_async(|r| {
     r.set_conv_mode(ConvMode::Autonomous)
 }).await?;
@@ -228,6 +257,8 @@ adc.device.sequence_cfg().modify_async(|r| {
 adc.device.auto_seq_ch_sel().write_with_zero_async(|r| {
     r.set_auto_seq_ch_sel(0x0F)
 }).await?;
+# Ok(())
+# }
 ```
 
 ## License

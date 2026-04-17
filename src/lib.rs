@@ -190,8 +190,8 @@ impl<SPI: SpiDevice> AsyncRegisterInterface for SpiInterface<SPI> {
 /// (on-the-fly mode, §7.4.3). Implement this for custom bus wrappers.
 ///
 /// The returned `u16` is MSB-aligned:
-/// - OSR = 0: 12-bit result in bits [15:4]; bits [3:0] = 0.
-/// - OSR > 0: full 16-bit averaged result in bits [15:0].
+/// - OSR = 0: 12-bit result in bits \[15:4\]; bits \[3:0\] = 0.
+/// - OSR > 0: full 16-bit averaged result in bits \[15:0\].
 #[allow(async_fn_in_trait)]
 pub trait CanConvert: AsyncRegisterInterface<AddressType = u8> {
     /// Select `channel` (0–7) and return the raw 16-bit MSB-aligned ADC word.
@@ -367,7 +367,7 @@ impl<IF: AsyncRegisterInterface<AddressType = u8>, CHIP: HasStats, C0, C1, C2, C
         Ok(())
     }
 
-    /// Set which channels can assert the ALERT pin (bit N = 1 enables CH[N]).
+    /// Set which channels can assert the ALERT pin (bit N = 1 enables CH\[N\]).
     pub async fn set_alert_channel_mask(&mut self, mask: u8) -> Result<(), IF::Error> {
         self.device
             .alert_ch_sel()
@@ -376,7 +376,7 @@ impl<IF: AsyncRegisterInterface<AddressType = u8>, CHIP: HasStats, C0, C1, C2, C
         Ok(())
     }
 
-    /// Read the combined event flags register (bit N = OR of high and low flags for CH[N]).
+    /// Read the combined event flags register (bit N = OR of high and low flags for CH\[N\]).
     pub async fn event_flags(&mut self) -> Result<u8, IF::Error> {
         Ok(self.device.event_flag().read_async().await?.event_flag())
     }
@@ -514,7 +514,7 @@ impl<IF: AsyncRegisterInterface<AddressType = u8>, CHIP: HasRmsZcd, C0, C1, C2, 
         Ok(())
     }
 
-    /// Set which GPO outputs are updated on zero-crossing detection (bit N = 1 enables GPO[N]).
+    /// Set which GPO outputs are updated on zero-crossing detection (bit N = 1 enables GPO\[N\]).
     pub async fn set_zcd_gpo_update_mask(&mut self, mask: u8) -> Result<(), IF::Error> {
         self.device
             .gpo_zcd_update_en()
@@ -621,8 +621,8 @@ macro_rules! impl_channel {
                 /// OSR_DONE, then reads the result from the RECENT_CH$n registers.
                 ///
                 /// Returns the raw 16-bit MSB-aligned ADC word:
-                ///   OSR = 0: 12-bit result in bits [15:4]; bits [3:0] = 0.
-                ///   OSR > 0: full 16-bit averaged result in bits [15:0].
+                ///   OSR = 0: 12-bit result in bits \[15:4\]; bits \[3:0\] = 0.
+                ///   OSR > 0: full 16-bit averaged result in bits \[15:0\].
                 pub async fn [<read_ch $n _polled>](&mut self) -> Result<u16, IF::Error> {
                     self.device.general_cfg().modify_async(|r| r.set_stats_en(true)).await?;
                     self.device.manual_ch_sel().write_async(|r| {
