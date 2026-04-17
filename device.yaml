@@ -96,10 +96,19 @@ DataCfg:
       description: Append 4-bit channel ID or status flags to ADC output data.
       conversion:
         name: AppendStatus
-        None: 0
-        ChannelId: 1
-        StatusFlags: 2
-        Reserved: "catch_all"
+        description: Controls what is appended after the ADC output word.
+        None:
+          value: 0
+          description: No additional bits appended.
+        ChannelId:
+          value: 1
+          description: Append 4-bit channel ID.
+        StatusFlags:
+          value: 2
+          description: Append 4-bit status flags.
+        Reserved:
+          value: "catch_all"
+          description: Reserved.
 
 OsrCfg:
   type: register
@@ -116,14 +125,31 @@ OsrCfg:
       description: Number of samples averaged per conversion result.
       conversion:
         name: OversamplingRatio
-        Osr1: 0
-        Osr2: 1
-        Osr4: 2
-        Osr8: 3
-        Osr16: 4
-        Osr32: 5
-        Osr64: 6
-        Osr128: 7
+        description: Number of samples averaged per conversion result.
+        Osr1:
+          value: 0
+          description: No averaging (single sample).
+        Osr2:
+          value: 1
+          description: Average 2 samples.
+        Osr4:
+          value: 2
+          description: Average 4 samples.
+        Osr8:
+          value: 3
+          description: Average 8 samples.
+        Osr16:
+          value: 4
+          description: Average 16 samples.
+        Osr32:
+          value: 5
+          description: Average 32 samples.
+        Osr64:
+          value: 6
+          description: Average 64 samples.
+        Osr128:
+          value: 7
+          description: Average 128 samples.
 
 OpmodeCfg:
   type: register
@@ -144,9 +170,16 @@ OpmodeCfg:
       description: Conversion initiation mode.
       conversion:
         name: ConvMode
-        Manual: 0
-        Autonomous: 1
-        Reserved: "catch_all"
+        description: Selects how conversions are initiated.
+        Manual:
+          value: 0
+          description: Conversions triggered by host (SCL-stretch, CNVST, or SPI frame).
+        Autonomous:
+          value: 1
+          description: Device runs conversions continuously at the configured rate.
+        Reserved:
+          value: "catch_all"
+          description: Reserved.
     osc_sel:
       base: bool
       start: 4
@@ -259,9 +292,16 @@ SequenceCfg:
       description: Scanning mode selection.
       conversion:
         name: SeqMode
-        Manual: 0
-        AutoSequence: 1
-        Reserved: "catch_all"
+        description: Channel scanning mode for the sequencer.
+        Manual:
+          value: 0
+          description: Host selects channel via MANUAL_CHID each conversion.
+        AutoSequence:
+          value: 1
+          description: Sequencer cycles through channels enabled in AUTO_SEQ_CHSEL.
+        Reserved:
+          value: "catch_all"
+          description: Reserved.
 
 ManualChSel:
   type: register
@@ -278,15 +318,34 @@ ManualChSel:
       description: Target channel (0–7 = AIN0–AIN7; channel must not be configured as GPIO).
       conversion:
         name: ChannelId
-        Ain0: 0
-        Ain1: 1
-        Ain2: 2
-        Ain3: 3
-        Ain4: 4
-        Ain5: 5
-        Ain6: 6
-        Ain7: 7
-        Reserved: "catch_all"
+        description: Analog input channel selection.
+        Ain0:
+          value: 0
+          description: Analog input AIN0.
+        Ain1:
+          value: 1
+          description: Analog input AIN1.
+        Ain2:
+          value: 2
+          description: Analog input AIN2.
+        Ain3:
+          value: 3
+          description: Analog input AIN3.
+        Ain4:
+          value: 4
+          description: Analog input AIN4.
+        Ain5:
+          value: 5
+          description: Analog input AIN5.
+        Ain6:
+          value: 6
+          description: Analog input AIN6.
+        Ain7:
+          value: 7
+          description: Analog input AIN7.
+        Reserved:
+          value: "catch_all"
+          description: Reserved.
 
 AutoSeqChSel:
   type: register
@@ -346,10 +405,19 @@ AlertPinCfg:
       description: ALERT assertion behavior.
       conversion:
         name: AlertLogic
-        ActiveLow: 0
-        ActiveHigh: 1
-        PulsedLow: 2
-        PulsedHigh: 3
+        description: ALERT pin assertion behavior.
+        ActiveLow:
+          value: 0
+          description: ALERT is asserted low and held until flags are cleared.
+        ActiveHigh:
+          value: 1
+          description: ALERT is asserted high and held until flags are cleared.
+        PulsedLow:
+          value: 2
+          description: ALERT pulses low on each new alert event.
+        PulsedHigh:
+          value: 3
+          description: ALERT pulses high on each new alert event.
 
 EventFlag:
   type: register
@@ -602,15 +670,34 @@ RmsCfg:
       description: Channel to compute RMS on.
       conversion:
         name: RmsChannelId
-        Ain0: 0
-        Ain1: 1
-        Ain2: 2
-        Ain3: 3
-        Ain4: 4
-        Ain5: 5
-        Ain6: 6
-        Ain7: 7
-        Reserved: "catch_all"
+        description: Analog input channel to compute RMS on.
+        Ain0:
+          value: 0
+          description: Compute RMS on AIN0.
+        Ain1:
+          value: 1
+          description: Compute RMS on AIN1.
+        Ain2:
+          value: 2
+          description: Compute RMS on AIN2.
+        Ain3:
+          value: 3
+          description: Compute RMS on AIN3.
+        Ain4:
+          value: 4
+          description: Compute RMS on AIN4.
+        Ain5:
+          value: 5
+          description: Compute RMS on AIN5.
+        Ain6:
+          value: 6
+          description: Compute RMS on AIN6.
+        Ain7:
+          value: 7
+          description: Compute RMS on AIN7.
+        Reserved:
+          value: "catch_all"
+          description: Reserved.
     rms_dc_sub:
       base: bool
       start: 2
@@ -622,10 +709,19 @@ RmsCfg:
       description: Number of samples used for RMS accumulation.
       conversion:
         name: RmsSampleCount
-        Samples1024: 0
-        Samples4096: 1
-        Samples16384: 2
-        Samples65536: 3
+        description: Number of samples accumulated for the RMS calculation.
+        Samples1024:
+          value: 0
+          description: Accumulate 1024 samples.
+        Samples4096:
+          value: 1
+          description: Accumulate 4096 samples.
+        Samples16384:
+          value: 2
+          description: Accumulate 16384 samples.
+        Samples65536:
+          value: 3
+          description: Accumulate 65536 samples.
 
 RmsLsb:
   type: register
