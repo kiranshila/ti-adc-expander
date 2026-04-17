@@ -59,7 +59,7 @@ ti-adc-expander = { version = "0.1", features = ["defmt"] }
 
 ## Chip capability tiers
 
-```
+```text
 Tla252x  (TLA2518 / TLA2528)
 │  ADC reads (SCL-stretch), GPIO, oversampling, sequencing
 │
@@ -92,7 +92,7 @@ The device address is set by resistors on the `ADDR` pin (I²C parts only):
 
 ### I²C
 
-```rust
+```rust,ignore
 use ti_adc_expander::{Ads7138, Address, OversamplingRatio};
 
 // Create the driver — all channels start as `Unconfigured`
@@ -123,7 +123,7 @@ adc.write_ch3(true).await?;
 
 ### SPI
 
-```rust
+```rust,ignore
 use ti_adc_expander::{Ads7038, OversamplingRatio};
 
 // SPI driver — no address needed
@@ -160,7 +160,7 @@ lacks the statistics register block.
 
 ## Alert thresholds (ADS7x38 / ADS7x28)
 
-```rust
+```rust,ignore
 // Set 12-bit high/low thresholds for channel 0
 adc.set_ch0_thresholds(3000, 500).await?;
 adc.set_ch0_hysteresis(4).await?;       // effective = 4 << 3 LSBs
@@ -177,7 +177,7 @@ adc.clear_event_high_flags(highs).await?;
 
 ## RMS and ZCD (ADS7x28 only)
 
-```rust
+```rust,ignore
 use ti_adc_expander::{Ads7128, RmsChannelId, RmsSampleCount};
 
 let mut adc = Ads7128::new(i2c, Address::X10);
@@ -205,7 +205,7 @@ adc.set_zcd_gpo_update_mask(0b0000_0001).await?;
 `reset()` issues a soft reset and returns a fresh driver with all channels back
 to `Unconfigured`, preserving the chip type:
 
-```rust
+```rust,ignore
 let adc = adc.reset().await?;
 // adc is now Ads7138<I2C> — all channel type params are Unconfigured
 ```
@@ -215,7 +215,7 @@ let adc = adc.reset().await?;
 The `device` field exposes the full register map for anything not covered by the
 high-level API:
 
-```rust
+```rust,ignore
 adc.device.opmode_cfg().modify_async(|r| {
     r.set_conv_mode(ConvMode::Autonomous)
 }).await?;
