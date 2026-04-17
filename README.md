@@ -21,6 +21,10 @@ Built on [`embedded-hal-async`](https://crates.io/crates/embedded-hal-async) and
 [`device-driver`](https://crates.io/crates/device-driver). All methods return the
 bus error type directly — no wrapper enum.
 
+> **Note:** SPI support is implemented based on the datasheet but has not been
+> validated on hardware. Only the I²C variants (TLA2528, ADS7138, ADS7128) have
+> been tested. Bug reports and PRs for SPI are welcome.
+
 ## Features
 
 - Async-only, `no_std` compatible
